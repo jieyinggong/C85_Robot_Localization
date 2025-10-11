@@ -21,6 +21,8 @@
 
 #include "btcomm.h"
 
+int get_color_from_rgb(int R, int G, int B);
+
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
   char reply[1024];
@@ -62,6 +64,91 @@ int main(int argc, char *argv[]) {
 
   BT_play_tone_sequence(tone_data);
 
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  BT_drive(MOTOR_A, MOTOR_B, 50);  // Drive motors A and B forward at 50% power
+  sleep(2);  // Drive for 2 seconds
+
+  // Test stopping with brake mode
+  fprintf(stderr, "Testing stop with brake mode...\n");
+  BT_motor_port_stop(MOTOR_A | MOTOR_B, 1);  // Stop motors A and B with active brake
+  sleep(1);
+
+  // Test turning left
+  fprintf(stderr, "Testing turn left...\n");
+  BT_turn(MOTOR_A, 50, MOTOR_B, -50);  // Turn left by running motor A forward and motor B backward
+  sleep(2);
+
+  // Test turning right
+  fprintf(stderr, "Testing turn right...\n");
+  BT_turn(MOTOR_A, -50, MOTOR_B, 50);  // Turn right by running motor A backward and motor B forward
+  sleep(2);
+
+  // Test stopping without brake mode
+  fprintf(stderr, "Testing stop without brake mode...\n");
+  BT_motor_port_stop(MOTOR_A | MOTOR_B, 0);  // Stop motors A and B without active brake
+  sleep(1);
+
+  // Test reading RGB color sensor
+  fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(SENSOR_1, &R, &G, &B, &A) == 0) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = get_color_from_rgb(R, G, B);
+    switch (color) {
+      case 0:
+        fprintf(stderr, "Detected color: Red\n");
+        break;
+      case 1:
+        fprintf(stderr, "Detected color: Yellow\n");
+        break;
+      case 2:
+        fprintf(stderr, "Detected color: Green\n");
+        break;
+      case 3:
+        fprintf(stderr, "Detected color: Blue\n");
+        break;
+      case 4:
+        fprintf(stderr, "Detected color: Black\n");
+        break;
+      case 5:
+        fprintf(stderr, "Detected color: White\n");
+        break;
+      default:
+        fprintf(stderr, "Detected color: Other\n");
+        break;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+  }
+
   BT_close();
   fprintf(stderr, "Done!\n");
+}
+
+int get_color_from_rgb(int R, int G, int B) {
+  // Thresholds for color detection
+  const int RED_THRESHOLD = 200;
+  const int GREEN_THRESHOLD = 200;
+  const int BLUE_THRESHOLD = 200;
+  const int BLACK_THRESHOLD = 50;
+  const int WHITE_THRESHOLD = 600;
+
+  int brightness = R + G + B;
+
+  if (brightness < BLACK_THRESHOLD) {
+    return 4;  // Black
+  } else if (brightness > WHITE_THRESHOLD) {
+    return 5;  // White
+  } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
+    return 0;  // Red
+  } else if (R > RED_THRESHOLD && G > GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
+    return 1;  // Yellow
+  } else if (G > GREEN_THRESHOLD && R < RED_THRESHOLD && B < BLUE_THRESHOLD) {
+    return 2;  // Green
+  } else if (B > BLUE_THRESHOLD && R < RED_THRESHOLD && G < GREEN_THRESHOLD) {
+    return 3;  // Blue
+  } else {
+    return 6;  // Other
+  }
 }
