@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
 // just uncomment your bot's hex key to compile for your bot, and comment the
 // other ones out.
 #ifndef HEXKEY
-#define HEXKEY "00:16:53:56:55:D9"  // <--- SET UP YOUR EV3's HEX ID here
+#define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
 #endif
 
   BT_open(HEXKEY);
@@ -66,33 +66,33 @@ int main(int argc, char *argv[]) {
 
   // Test driving forward
   fprintf(stderr, "Testing drive forward...\n");
-  BT_drive(MOTOR_A, MOTOR_B, 50);  // Drive motors A and B forward at 50% power
+  BT_drive(MOTOR_A, MOTOR_C, 50);  // Drive motors A and B forward at 50% power
   sleep(2);  // Drive for 2 seconds
 
   // Test stopping with brake mode
   fprintf(stderr, "Testing stop with brake mode...\n");
-  BT_motor_port_stop(MOTOR_A | MOTOR_B, 1);  // Stop motors A and B with active brake
+  BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
   sleep(1);
-
-  // Test turning left
-  fprintf(stderr, "Testing turn left...\n");
-  BT_turn(MOTOR_A, 50, MOTOR_B, -50);  // Turn left by running motor A forward and motor B backward
-  sleep(2);
 
   // Test turning right
   fprintf(stderr, "Testing turn right...\n");
-  BT_turn(MOTOR_A, -50, MOTOR_B, 50);  // Turn right by running motor A backward and motor B forward
+  BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn left by running motor A forward and motor B backward
+  sleep(2);
+
+  // Test turning left
+  fprintf(stderr, "Testing turn left...\n");
+  BT_turn(MOTOR_A, -50, MOTOR_C, 50);  // Turn right by running motor A backward and motor C forward
   sleep(2);
 
   // Test stopping without brake mode
   fprintf(stderr, "Testing stop without brake mode...\n");
-  BT_motor_port_stop(MOTOR_A | MOTOR_B, 0);  // Stop motors A and B without active brake
+  BT_motor_port_stop(MOTOR_A | MOTOR_C, 0);  // Stop motors A and B without active brake
   sleep(1);
 
   // Test reading RGB color sensor
   fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
   int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(SENSOR_1, &R, &G, &B, &A) == 0) {
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
     int color = get_color_from_rgb(R, G, B);
     switch (color) {
