@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
   int R, G, B, A;
   if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = get_color_from_rgb(R, G, B);
+    int color = get_color_from_rgb(R, G, B, A);
     switch (color) {
       case 0:
         fprintf(stderr, "Detected color: Red\n");
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "Done!\n");
 }
 
-int get_color_from_rgb(int R, int G, int B) {
+int get_color_from_rgb(int R, int G, int B, int A) {
   // Thresholds for color detection
   const int RED_THRESHOLD = 200;
   const int GREEN_THRESHOLD = 200;
@@ -136,9 +136,9 @@ int get_color_from_rgb(int R, int G, int B) {
 
   int brightness = R + G + B;
 
-  if (brightness < BLACK_THRESHOLD) {
+  if (brightness < BLACK_THRESHOLD || A > 80) {
     return 4;  // Black
-  } else if (brightness > WHITE_THRESHOLD) {
+  } else if (brightness > WHITE_THRESHOLD || A < 10) {
     return 5;  // White
   } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
     return 0;  // Red
