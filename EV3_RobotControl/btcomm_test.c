@@ -21,7 +21,7 @@
 
 #include "btcomm.h"
 
-int get_color_from_rgb(int R, int G, int B);
+int get_color_from_rgb(int R, int G, int B, int A);
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
@@ -120,6 +120,30 @@ int main(int argc, char *argv[]) {
     }
   } else {
     fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+  }
+
+  // Test reading gyro sensor and turning right 90 degrees
+  fprintf(stderr, "Testing gyro sensor for 90-degree turn...\n");
+  int angle = 0, rate = 0;
+
+  // Reset gyro sensor to zero
+  if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
+    fprintf(stderr, "Failed to reset gyro sensor.\n");
+  } else {
+    // Start turning right
+    BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
+
+    // Monitor the angle until it reaches 90 degrees
+    while (angle < 90) {
+      if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
+        fprintf(stderr, "Failed to read gyro sensor.\n");
+        break;
+      }
+      fprintf(stderr, "Current angle: %d\n", angle);
+    }
+
+    // Stop the motors
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
   }
 
   BT_close();
