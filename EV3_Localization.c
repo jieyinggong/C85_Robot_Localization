@@ -94,6 +94,33 @@ int map[400][4];            // This holds the representation of the map, up to 2
 int sx, sy;                 // Size of the map (number of intersections along x and y)
 double beliefs[400][4];     // Beliefs for each location and motion direction
 
+int get_color_from_rgb(int R, int G, int B) {
+  // Thresholds for color detection
+  const int RED_THRESHOLD = 200;
+  const int GREEN_THRESHOLD = 200;
+  const int BLUE_THRESHOLD = 200;
+  const int BLACK_THRESHOLD = 50;
+  const int WHITE_THRESHOLD = 600;
+
+  int brightness = R + G + B;
+
+  if (brightness < BLACK_THRESHOLD) {
+    return 4;  // Black
+  } else if (brightness > WHITE_THRESHOLD) {
+    return 5;  // White
+  } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
+    return 0;  // Red
+  } else if (R > RED_THRESHOLD && G > GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
+    return 1;  // Yellow
+  } else if (G > GREEN_THRESHOLD && R < RED_THRESHOLD && B < BLUE_THRESHOLD) {
+    return 2;  // Green
+  } else if (B > BLUE_THRESHOLD && R < RED_THRESHOLD && G < GREEN_THRESHOLD) {
+    return 3;  // Blue
+  } else {
+    return 6;  // Other
+  }
+}
+
 int main(int argc, char *argv[])
 {
  char mapname[1024];
