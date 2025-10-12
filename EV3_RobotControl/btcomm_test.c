@@ -21,7 +21,7 @@
 
 #include "btcomm.h"
 
-int get_color_from_rgb(int R, int G, int B);
+int get_color_from_rgb(int R, int G, int B, int A);
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
@@ -66,8 +66,8 @@ int main(int argc, char *argv[]) {
 
   // Test driving forward
   fprintf(stderr, "Testing drive forward...\n");
-  BT_drive(MOTOR_A, MOTOR_C, 50);  // Drive motors A and B forward at 50% power
-  sleep(2);  // Drive for 2 seconds
+  BT_drive(MOTOR_A, MOTOR_C, 12, 10);
+  sleep(8);  // Drive for 4 seconds
 
   // Test stopping with brake mode
   fprintf(stderr, "Testing stop with brake mode...\n");
