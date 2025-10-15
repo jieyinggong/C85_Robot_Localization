@@ -180,6 +180,7 @@ void color_calibration_rgb(int R, int G, int B){
     } else {
       color = 6;  // Other
     }
+    printf("R=%d, G=%d, B=%d, Color=%d\n", R, G, B, color);
 
     if (color == 0){ // don't get it get past the border
       BT_turn(MOTOR_A, -50, MOTOR_C, 50); // Turn left
