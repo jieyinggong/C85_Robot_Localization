@@ -87,6 +87,7 @@
 */
 
 #include "EV3_Localization.h"
+#include "btcomm.h"
 
 int map[400][4];            // This holds the representation of the map, up to 20x20
                             // intersections, raster ordered, 4 building colours per
@@ -94,7 +95,7 @@ int map[400][4];            // This holds the representation of the map, up to 2
 int sx, sy;                 // Size of the map (number of intersections along x and y)
 double beliefs[400][4];     // Beliefs for each location and motion direction
 
-int get_color_from_rgb(int R, int G, int B) {
+int get_color_from_rgb(int R, int G, int B, int A) {
   // Thresholds for color detection
   const int RED_THRESHOLD = 200;
   const int GREEN_THRESHOLD = 200;
@@ -104,9 +105,9 @@ int get_color_from_rgb(int R, int G, int B) {
 
   int brightness = R + G + B;
 
-  if (brightness < BLACK_THRESHOLD) {
+  if (brightness < BLACK_THRESHOLD || A > 80) {
     return 4;  // Black
-  } else if (brightness > WHITE_THRESHOLD) {
+  } else if (brightness > WHITE_THRESHOLD || A < 10) {
     return 5;  // White
   } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
     return 0;  // Red
@@ -246,14 +247,109 @@ int main(int argc, char *argv[])
 
 int find_street(void)   
 {
- /*
-  * This function gets your robot onto a street, wherever it is placed on the map. You can do this in many ways, but think
-  * about what is the most effective and reliable way to detect a street and stop your robot once it's on it.
-  * 
-  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
-  * bot after calling this function
-  */   
-  return(0);
+  /*
+   * Simple but safe strategy:
+   * - Drive forward while polling the colour sensor in short intervals so red/black are detected during motion.
+   * - If red detected -> back up and turn ~180 degrees to avoid leaving the map.
+   * - If black detected -> stop and return success.
+   * - If nothing after MAX_ATTEMPTS, return failure.
+   */
+  const int MAX_ATTEMPTS = 40;
+  const int FORWARD_TOTAL_US = 200000; // total forward probe time
+  const int POLL_US = 40000;           // poll interval while moving
+  const int BACKUP_US = 150000;        // backup duration when seeing red
+  const int TURN180_US = 700000;       // approximate 180deg spin duration (adjust on robot)
+  const int DRIVE_POWER = 40;
+  const int TURN_POWER = 40;
+
+  int R=0,G=0,B=0,A=0;
+  int col;
+
+  // Quick check: already on a street?
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    col = get_color_from_rgb(R,G,B,A);
+    if (col == 4) { // black
+      BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+      return 1;
+    }
+  }
+
+  for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    // Start driving forward and poll frequently during the motion
+    BT_drive(MOTOR_A, MOTOR_C, DRIVE_POWER, DRIVE_POWER);
+    int loops = FORWARD_TOTAL_US / POLL_US;
+    for (int p = 0; p < loops; p++) {
+      usleep(POLL_US);
+      if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+        col = get_color_from_rgb(R,G,B,A);
+        if (col == 0) {
+          // RED border detected: immediately stop, back up, and turn around
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(50000);
+          BT_drive(MOTOR_A, MOTOR_C, -DRIVE_POWER/2, -DRIVE_POWER/2);
+          usleep(BACKUP_US);
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(80000);
+          // Spin ~180 degrees to return into map
+          BT_turn(MOTOR_A, TURN_POWER, MOTOR_C, -TURN_POWER);
+          usleep(TURN180_US);
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(100000);
+          goto NEXT_ATTEMPT; // continue searching in new heading
+        }
+        if (col == 4) {
+          // BLACK (street) detected while moving
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(50000);
+          return 1;
+        }
+      }
+    }
+    // stop after forward probe if nothing found
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+    usleep(40000);
+
+    // Rotate in place while polling (alternate left/right)
+    if ((attempt & 1) == 0) {
+      BT_turn(MOTOR_A, -TURN_POWER, MOTOR_C, TURN_POWER); // left
+    } else {
+      BT_turn(MOTOR_A, TURN_POWER, MOTOR_C, -TURN_POWER); // right
+    }
+    int rotate_loops = FORWARD_TOTAL_US / POLL_US; // reuse similar chunk for rotation
+    for (int q = 0; q < rotate_loops; q++) {
+      usleep(POLL_US);
+      if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+        col = get_color_from_rgb(R,G,B,A);
+        if (col == 0) {
+          // RED detected during rotation -> stop, back up and turn 180
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(50000);
+          BT_drive(MOTOR_A, MOTOR_C, -DRIVE_POWER/2, -DRIVE_POWER/2);
+          usleep(BACKUP_US);
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(80000);
+          BT_turn(MOTOR_A, TURN_POWER, MOTOR_C, -TURN_POWER);
+          usleep(TURN180_US);
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(100000);
+          break; // break rotation polling and continue attempts
+        }
+        if (col == 4) {
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+          usleep(50000);
+          return 1;
+        }
+      }
+    }
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+    usleep(40000);
+
+NEXT_ATTEMPT:
+    ; // label target
+  }
+
+  // Failed to find a street within attempt limit
+  return 0;
 }
 
 int drive_along_street(void)
@@ -269,7 +365,47 @@ int drive_along_street(void)
   * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
   * bot after calling this function.
   */   
+
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+
+  // Test stopping with brake mode
+  // stop when detect intersection
+  if (detect_intersection()) {
+    fprintf(stderr, "Detected intersection, stopping...\n");
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+    sleep(1);
+    return 1; // Successfully reached an intersection
+  }
+
   return(0);
+}
+
+int detect_intersection(void)
+{
+ /*
+  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
+  * you like, but it should be reliable and robust.
+  * 
+  * The return value should be 1 if an intersection is detected, and 0 otherwise.
+  */   
+  // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = get_color_from_rgb(R, G, B, A);
+    if (color == 1) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
 }
 
 int scan_intersection(int *tl, int *tr, int *br, int *bl)
