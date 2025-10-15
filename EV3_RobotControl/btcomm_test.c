@@ -23,11 +23,12 @@
 
 int get_color_from_rgb(int R, int G, int B, int A);
 void color_calibration_rgb(); 
+int tone_data[50][3];
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
   char reply[1024];
-  int tone_data[50][3];
+  //int tone_data[50][3];
 
   // Reset tone data information
   for (int i = 0; i < 50; i++) {
@@ -67,6 +68,9 @@ int main(int argc, char *argv[]) {
 
   int R, G, B, A;
   color_calibration_rgb();
+
+  BT_close();
+  fprintf(stderr, "Done!\n");
   
   return 0; 
 
@@ -194,17 +198,18 @@ void color_calibration_rgb(){
   int max_light = 0;  // detect white
   int min_light = 700;  // detect black
   int max_r = 0, max_g = 0, max_b = 0; // detect red, green, blue
-  int max_y[3] = {128,128,0}; // detect yellow. Yellow is when red ~= green
-  int err = 10; // error tolerance
+  int max_y[3] = {0,0,0}; // detect yellow. Yellow is when red ~= green
+  int err = 20; // error tolerance
+  int bright_err = 50; // error tolerance brightness
+  int other_err = 15 
   double color_probability[7] = {1,1,1,1,1,1,1}; // probability for correct prediction of every color
 
   // color sensing
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 20; i++) {
     BT_drive(MOTOR_A, MOTOR_C, 12, 10); // Drive forward
-    sleep(0.5);  // Drive for 0.5 seconds
+    sleep(1);  // Drive for 1 second
     BT_motor_port_stop(MOTOR_A | MOTOR_C, 1); // Stop with active brake
     BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
-    printf("Reading %d: R=%d, G=%d, B=%d, A=%d\n", i, R, G, B, A);
 
     printf("Max Light=%d, Min Light=%d, Max R=%d, Max G=%d, Max B=%d, Max Y0=%d, Max Y1=%d, Max Y2=%d\n", max_light, min_light, max_r, max_g, max_b, max_y[0], max_y[1], max_y[2]);
     A *= 1.0; // adjust for ambient light
@@ -214,12 +219,17 @@ void color_calibration_rgb(){
 
     int brightness = R + G + B;
     
-    // calibrate colors 
+    // calibrate brightness 
     if (brightness > max_light) { // white. white and black first makes sure that color > max_color isn't because its white so the value is high 
       max_light = brightness;
     }
-    else if (brightness < min_light) { // black
+    if (brightness < min_light) { // black
       min_light = brightness;
+    }
+
+    // calibrate rgb 
+    else if (B > max_b) {  // blue
+      max_b = B;
     }
     else if (abs(R - G) < 20) {  // yellow. yellow goes before rgb so that r and g aren't big cuz yellow
       if (R + G > max_y[0] + max_y[1]) {
@@ -234,31 +244,54 @@ void color_calibration_rgb(){
     else if (G > max_g) {  // green
       max_g = G;
     }
-    else if (B > max_b) {  // blue
-      max_b = B;
-    }
 
     int color = -1;
     // detect color
-    if (brightness < min_light + err) {
+    if (brightness < min_light + bright_err) {
       color = 4;  // Black
-    } else if (brightness > max_light - err) {
+    } else if (brightness > max_light - bright_err) {
       color = 5;  // White
-    } else if (R > max_y[0] - err && G > max_y[1] - err && B < max_y[2] + err) {
+    } else if (abs(R - G) < 6 && B < R - other_err) {
       color = 1;  // Yellow
-    } else if (R > max_r - err && G < max_g - err && B < max_b - err) {
+    } else if (R > max_r - err && (G < R - other_err && B < R - other_err)) { // bigger than max red, G and B can't be bigger than R - err
       color = 0;  // Red
-    } else if (G > max_g - err && R < max_r - err && B < max_b - err) {
+    } else if (G > B) {
       color = 2;  // Green
-    } else if (B > max_b - err && R < max_r - err && G < max_g - err) {
-      color = 3;  // Blue
     } else {
-      color = 6;  // Other
+      color = 3;  // Blue
     }
+    // } else if (G > max_g - err || (R < G - other_err && B < G - other_err)) {
+    //   color = 2;  // Green
+    // } else if (B > max_b - err || (G < B - other_err && R < B - other_err)) {
+    //   color = 3;  // Blue
+    // } else {
+    //   color = 6;  // Other
+    // }
     printf("R=%d, G=%d, B=%d, Color=%d\n", R, G, B, color);
 
     if (color == 0){ // don't get it get past the border
-      BT_turn(MOTOR_A, -50, MOTOR_C, 50); // Turn left
+      // Reset gyro sensor to zero
+      int angle = 0, rate = 0;
+      if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
+        fprintf(stderr, "Failed to reset gyro sensor.\n");
+      } else {
+        // Start turning right
+        BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
+
+        // Monitor the angle until it reaches 90 degrees
+        while (angle < 90) {
+          if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
+            fprintf(stderr, "Failed to read gyro sensor.\n");
+            break;
+          }
+        }
+
+        // Stop the motors
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
+      }
+    }
+    if (color == 2){ // green - play a tone
+      BT_play_tone_sequence(tone_data);
     }
   }
 
