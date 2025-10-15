@@ -47,6 +47,44 @@ int main(int argc, char *argv[]) {
   tone_data[3][1] = 250;
   tone_data[3][2] = 63;
 
+  int TONE_GREEN[50][3] = {
+  {330,150,30},  // E4
+  {392,150,40},  // G4
+  {523,220,50},  // C5 (land)
+  {-1,-1,-1}     // terminator
+  };
+
+  int TONE_BLUE[50][3] = {
+  {523,130,30},  // C5
+  {392,130,30},  // G4
+  {330,200,30},  // E4
+  {-1,-1,-1}
+  };
+
+  int TONE_WHITE[50][3] = {
+  {523,90,18},   // C5
+  {523,90,18},   // C5 (repeat)
+  {523,90,18},   // C5 (repeat)
+  {-1,-1,-1}
+  };
+
+  int TONE_INTERSECTION[50][3] = {
+  {880,100,40},   // A5
+  {440,100,40},   // A4
+  {880,100,45},   // A5 again (echo)
+  {660,250,50},   // E5 (hold)
+  {-1,-1,-1}
+  };
+
+  int TONE_LOCALIZATION_DONE[50][3] = {
+  {392,180,45},   // G4
+  {523,180,50},   // C5
+  {659,180,55},   // E5
+  {784,220,60},   // G5 (octave)
+  {1047,400,63},  // C6 (bright finale)
+  {-1,-1,-1}
+  };
+
   memset(&reply[0], 0, 1024);
 
 // just uncomment your bot's hex key to compile for your bot, and comment the
@@ -62,12 +100,22 @@ int main(int argc, char *argv[]) {
   BT_setEV3name("R2D2");
 
   BT_play_tone_sequence(tone_data);
+  sleep(1);
+  BT_play_tone_sequence(TONE_GREEN);
+  sleep(1);
+  BT_play_tone_sequence(TONE_BLUE);
+  sleep(1);
+  BT_play_tone_sequence(TONE_WHITE);
+  sleep(1);
+  BT_play_tone_sequence(TONE_INTERSECTION);
+  sleep(1);
+  BT_play_tone_sequence(TONE_LOCALIZATION_DONE);
 
-  // test find_street function
-  if (find_street()) 
-  {
-    fprintf(stderr, "Street found!\n");
-  }
+  // // test find_street function
+  // if (find_street()) 
+  // {
+  //   fprintf(stderr, "Street found!\n");
+  // }
 
   // // Test driving forward
   // fprintf(stderr, "Testing drive forward...\n");
