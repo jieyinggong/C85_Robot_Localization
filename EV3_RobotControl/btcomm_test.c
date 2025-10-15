@@ -22,6 +22,7 @@
 #include "btcomm.h"
 
 int get_color_from_rgb(int R, int G, int B, int A);
+void color_calibration_rgb(); 
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
@@ -64,6 +65,11 @@ int main(int argc, char *argv[]) {
 
   BT_play_tone_sequence(tone_data);
 
+  int R, G, B, A;
+  color_calibration_rgb();
+  
+  return 0; 
+
   // Test driving forward
   fprintf(stderr, "Testing drive forward...\n");
   BT_drive(MOTOR_A, MOTOR_C, 12, 10);
@@ -91,8 +97,8 @@ int main(int argc, char *argv[]) {
 
   // Test reading RGB color sensor
   fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
-  int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+  // int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
     int color = get_color_from_rgb(R, G, B, A);
     switch (color) {
@@ -146,6 +152,11 @@ int main(int argc, char *argv[]) {
     BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
   }
 
+  // Test color calibration
+  //  R,G,B,A;
+  // BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+  // color_calibration_rgb();
+
   BT_close();
   fprintf(stderr, "Done!\n");
 }
@@ -175,4 +186,83 @@ int get_color_from_rgb(int R, int G, int B, int A) {
   } else {
     return 6;  // Other
   }
+}
+
+void color_calibration_rgb(){
+  // provide middling values first for calibration
+  int R, G, B, A;
+  int max_light = 0;  // detect white
+  int min_light = 700;  // detect black
+  int max_r = 0, max_g = 0, max_b = 0; // detect red, green, blue
+  int max_y[3] = {128,128,0}; // detect yellow. Yellow is when red ~= green
+  int err = 10; // error tolerance
+  double color_probability[7] = {1,1,1,1,1,1,1}; // probability for correct prediction of every color
+
+  // color sensing
+  for (int i = 0; i < 10; i++) {
+    BT_drive(MOTOR_A, MOTOR_C, 12, 10); // Drive forward
+    sleep(0.5);  // Drive for 0.5 seconds
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1); // Stop with active brake
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    printf("Reading %d: R=%d, G=%d, B=%d, A=%d\n", i, R, G, B, A);
+
+    printf("Max Light=%d, Min Light=%d, Max R=%d, Max G=%d, Max B=%d, Max Y0=%d, Max Y1=%d, Max Y2=%d\n", max_light, min_light, max_r, max_g, max_b, max_y[0], max_y[1], max_y[2]);
+    A *= 1.0; // adjust for ambient light
+    G = (G + A)*1.3;
+    B = (B + A)*1.3;
+    R = (R + A)*1.3;
+
+    int brightness = R + G + B;
+    
+    // calibrate colors 
+    if (brightness > max_light) { // white. white and black first makes sure that color > max_color isn't because its white so the value is high 
+      max_light = brightness;
+    }
+    else if (brightness < min_light) { // black
+      min_light = brightness;
+    }
+    else if (abs(R - G) < 20) {  // yellow. yellow goes before rgb so that r and g aren't big cuz yellow
+      if (R + G > max_y[0] + max_y[1]) {
+        max_y[0] = R;
+        max_y[1] = G;
+        max_y[2] = B;
+      }
+    }
+    else if (R > max_r) {  // red
+      max_r = R;
+    }
+    else if (G > max_g) {  // green
+      max_g = G;
+    }
+    else if (B > max_b) {  // blue
+      max_b = B;
+    }
+
+    int color = -1;
+    // detect color
+    if (brightness < min_light + err) {
+      color = 4;  // Black
+    } else if (brightness > max_light - err) {
+      color = 5;  // White
+    } else if (R > max_y[0] - err && G > max_y[1] - err && B < max_y[2] + err) {
+      color = 1;  // Yellow
+    } else if (R > max_r - err && G < max_g - err && B < max_b - err) {
+      color = 0;  // Red
+    } else if (G > max_g - err && R < max_r - err && B < max_b - err) {
+      color = 2;  // Green
+    } else if (B > max_b - err && R < max_r - err && G < max_g - err) {
+      color = 3;  // Blue
+    } else {
+      color = 6;  // Other
+    }
+    printf("R=%d, G=%d, B=%d, Color=%d\n", R, G, B, color);
+
+    if (color == 0){ // don't get it get past the border
+      BT_turn(MOTOR_A, -50, MOTOR_C, 50); // Turn left
+    }
+  }
+
+  // color probability? 
+
+  return; 
 }

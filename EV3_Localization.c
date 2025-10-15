@@ -121,8 +121,9 @@ int get_color_from_rgb(int R, int G, int B) {
   }
 }
 
-void color_calibration_rgb(int R, int G, int B){
+void color_calibration_rgb(){
   // provide middling values first for calibration
+  int R, G, B, A;
   int max_light = 384;  // detect white
   int min_light = 384;  // detect black
   int max_r = 128, max_g = 128, max_b = 128; // detect red, green, blue
@@ -130,14 +131,14 @@ void color_calibration_rgb(int R, int G, int B){
   int err = 50; // error tolerance
   double color_probability[7] = {1,1,1,1,1,1,1}; // probability for correct prediction of every color
 
-  int brightness = R + G + B;
-
   // color sensing
   for (int i = 0; i < 10; i++) {
     BT_drive(MOTOR_A, MOTOR_C, 12, 10); // Drive forward
     sleep(4);  // Drive for 2 seconds???
     BT_motor_port_stop(MOTOR_A | MOTOR_C, 1); // Stop with active brake
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
     
+    int brightness = R + G + B;
     
     // calibrate colors 
     if (brightness > max_light) { // white. white and black first makes sure that color > max_color isn't because its white so the value is high 
@@ -163,7 +164,7 @@ void color_calibration_rgb(int R, int G, int B){
       max_b = B;
     }
 
-    int color = -1
+    int color = -1;
     // detect color
     if (brightness < min_light + err) {
       color = 4;  // Black
@@ -570,8 +571,8 @@ void calibrate_sensor(void)
   turning_calibration();
   moving_calibration();
   int R,G,B,A;
-  BT_read_colour_sensor_RGB(PORT_3, &R, &G, &B);
-  color_calibration_rgb(R,G,B);
+  BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+  color_calibration_rgb();
 
   fclose(fptr);
 
