@@ -121,6 +121,122 @@ int get_color_from_rgb(int R, int G, int B) {
   }
 }
 
+void color_calibration_rgb(int R, int G, int B){
+  // provide middling values first for calibration
+  int max_light = 384;  // detect white
+  int min_light = 384;  // detect black
+  int max_r = 128, max_g = 128, max_b = 128; // detect red, green, blue
+  int max_y[3] = {128,128,0}; // detect yellow. Yellow is when red ~= green
+  int err = 50; // error tolerance
+  double color_probability[7] = {1,1,1,1,1,1,1}; // probability for correct prediction of every color
+
+  int brightness = R + G + B;
+
+  // color sensing
+  for (int i = 0; i < 10; i++) {
+    BT_drive(MOTOR_A, MOTOR_C, 12, 10); // Drive forward
+    sleep(4);  // Drive for 2 seconds???
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1); // Stop with active brake
+    
+    
+    // calibrate colors 
+    if (brightness > max_light) { // white. white and black first makes sure that color > max_color isn't because its white so the value is high 
+      max_light = brightness;
+    }
+    else if (brightness < min_light) { // black
+      min_light = brightness;
+    }
+    else if (abs(R - G) < 20) {  // yellow. yellow goes before rgb so that r and g aren't big cuz yellow
+      if (R + G > max_y[0] + max_y[1]) {
+        max_y[0] = R;
+        max_y[1] = G;
+        max_y[2] = B;
+      }
+    }
+    else if (R > max_r) {  // red
+      max_r = R;
+    }
+    else if (G > max_g) {  // green
+      max_g = G;
+    }
+    else if (B > max_b) {  // blue
+      max_b = B;
+    }
+
+    int color = -1
+    // detect color
+    if (brightness < min_light + err) {
+      color = 4;  // Black
+    } else if (brightness > max_light - err) {
+      color = 5;  // White
+    } else if (R > max_y[0] - err && G > max_y[1] - err && B < max_y[2] + err) {
+      color = 1;  // Yellow
+    } else if (R > max_r - err && G < max_g - err && B < max_b - err) {
+      color = 0;  // Red
+    } else if (G > max_g - err && R < max_r - err && B < max_b - err) {
+      color = 2;  // Green
+    } else if (B > max_b - err && R < max_r - err && G < max_g - err) {
+      color = 3;  // Blue
+    } else {
+      color = 6;  // Other
+    }
+
+    if (color == 0){ // don't get it get past the border
+      BT_turn(MOTOR_A, -50, MOTOR_C, 50); // Turn left
+    }
+  }
+
+  // color probability? 
+
+  return; 
+}
+
+void turning_calibration(){
+  double turning_probability = 0; // probability for correct (<5 degree error) prediction of turning
+  double bias = 0; // bias for turning
+  int correct_turns = 0; // number of correct turns in history
+  int incorrect_turns = 0; // number of incorrect turns in history
+  int angle = 0; 
+  int target_angle = 90; // target angle to turn
+  int err = 5; // error tolerance
+
+  for (int i = 0; i < 10; i++) { // do 10 turns to get a good estimate of turning probability
+    // Reset gyro sensor to zero
+    if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
+      fprintf(stderr, "Failed to reset gyro sensor.\n");
+    } else {
+      // Start turning right
+      BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
+
+      // Monitor the angle until it reaches 90 degrees
+      while (angle < 90) {
+        if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
+          fprintf(stderr, "Failed to read gyro sensor.\n");
+          break;
+        }
+        fprintf(stderr, "Current angle: %d\n", angle);
+      }
+      // Stop the motors
+      BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
+    }
+
+    if (angle < target_angle - err) {
+      incorrect_turns++;
+    } else if (angle > target_angle + err) {
+      incorrect_turns++;
+    } else {
+      correct_turns++;
+    }
+    turning_probability = (float)correct_turns / (correct_turns + incorrect_turns); 
+  }
+  return; 
+}
+
+void moving_calibration(){
+  //???
+  return; 
+}
+
 int main(int argc, char *argv[])
 {
  char mapname[1024];
@@ -152,7 +268,16 @@ int main(int argc, char *argv[])
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
   *   read your calibration data for use in your localization code. Skip this if you are not using calibration
   * ****************************************************************************************************************/
- 
+  double turning_probability = 0; // probability for correct (<5 degree error) prediction of turning
+
+  FILE *fptr;
+  fptr = fopen("calibration.txt", "r");
+  if (fptr == NULL) {
+      fprintf(stderr, "Error opening file for calibration data!\n");
+      return;
+  }
+
+  fclose(fptr);
  
  // Your code for reading any calibration information should not go below this line //
  
@@ -434,6 +559,21 @@ void calibrate_sensor(void)
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
+  FILE *fptr;
+  fptr = fopen("calibration.txt", "w");
+  if (fptr == NULL) {
+      fprintf(stderr, "Error opening file for calibration data!\n");
+      return;
+  }
+
+  turning_calibration();
+  moving_calibration();
+  int R,G,B,A;
+  BT_read_colour_sensor_RGB(PORT_3, &R, &G, &B);
+  color_calibration_rgb(R,G,B);
+
+  fclose(fptr);
+
   fprintf(stderr,"Calibration function called!\n");  
 }
 
