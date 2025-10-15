@@ -64,17 +64,17 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         fprintf(stderr, "Failed to reset gyro sensor.\n");
         return -1;
     } else {
-        fprintf(stderr, "Gyro sensor reset to zero successfully.\n");
+        fprintf(stderr, "Scan intersection: Gyro sensor reset to zero successfully.\n");
     }
 
-    sleep(2); // Wait a moment for the gyro to stabilize
+    sleep(1); // Wait a moment for the gyro to stabilize
 
     // drive forwarde to the start point of scan
-    BT_timed_motor_port_start(MOTOR_A, 7, 80, 1400, 80); // Start motor A with power 7, ramp up time 80ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(MOTOR_C, 6, 100, 1400, 100); // Start motor C with power 7, ramp up time 80ms
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
-
-    sleep(1);
+    BT_timed_motor_port_start(MOTOR_A, 7, 80, 1400, 100); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 200ms
+    BT_timed_motor_port_start(MOTOR_C, 6, 100, 1400, 100); // Start motor C with power 6, ramp up time 500ms
+   // BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+    fprintf(stderr, "Drive forward to start point of scan.\n");
+    sleep(3); // Wait for the bot to reach the start point
 
     // start scanning
         double last_angle = 0.0;
@@ -94,7 +94,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         BT_turn(MOTOR_LEFT, 13, MOTOR_RIGHT, -9);
 
         // angle check and color scanning
-        while (theta_sum < 360.0 - 1) {  
+        while (theta_sum < 360.0 + 0.5) {  
             int angle_raw = 0;
             if (BT_read_gyro(PORT_GYRO, 0, &angle_raw, &rate) != 1) {
                 fprintf(stderr, "Failed to read gyro sensor.\n");
@@ -126,7 +126,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                 }
             }
 
-            usleep(5000);  // 5 ms 
+           // usleep(5000);  // 5 ms 
         }
 
         BT_motor_port_stop(MOTOR_LEFT | MOTOR_RIGHT, 1);  // stop while finish 360 degree turn
@@ -143,7 +143,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         BT_turn(MOTOR_LEFT, -11, MOTOR_RIGHT, 11);
 
         // angle check and color scanning
-        while (fabs(theta_sum) < 360.0 - 1) {
+        while (fabs(theta_sum) < 360.0 - 2) {
             int angle_raw = 0;
             if (BT_read_gyro(PORT_GYRO, 0, &angle_raw, &rate) != 1) {
                 fprintf(stderr, "Failed to read gyro sensor.\n");
@@ -175,7 +175,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                 }
             }
 
-            usleep(5000);  // 5 ms
+           // usleep(5000);  // 5 ms
         }
 
         BT_motor_port_stop(MOTOR_LEFT | MOTOR_RIGHT, 1);  // Stop after completing 360-degree turn
@@ -200,6 +200,8 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     color_samples_left[i][0] + color_samples_left[i][3], color_samples_left[i][1] + color_samples_left[i][3],
                     color_samples_left[i][2] + color_samples_left[i][3], color_samples_left[i][3]);
         }
+
+        fprintf(stderr, "Scan complete.\n");
     // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
     *(tl)=-1;
     *(tr)=-1;

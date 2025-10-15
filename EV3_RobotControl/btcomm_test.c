@@ -20,8 +20,7 @@
 // from the NXT to the EV3!
 
 #include "btcomm.h"
-
-int get_color_from_rgb(int R, int G, int B, int A);
+#include "intersection.h"
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
@@ -60,119 +59,22 @@ int main(int argc, char *argv[]) {
 
   // name must not contain spaces or special characters
   // max name length is 12 characters
-  BT_setEV3name("R2D2");
+  //BT_setEV3name("R2D2");
 
   BT_play_tone_sequence(tone_data);
 
-  // Test driving forward
-  fprintf(stderr, "Testing drive forward...\n");
-  BT_drive(MOTOR_A, MOTOR_C, 12, 10);
-  sleep(8);  // Drive for 4 seconds
-
-  // Test stopping with brake mode
-  fprintf(stderr, "Testing stop with brake mode...\n");
-  BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
-  sleep(1);
-
-  // Test turning right
-  fprintf(stderr, "Testing turn right...\n");
-  BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn left by running motor A forward and motor B backward
-  sleep(2);
-
-  // Test turning left
-  fprintf(stderr, "Testing turn left...\n");
-  BT_turn(MOTOR_A, -50, MOTOR_C, 50);  // Turn right by running motor A backward and motor C forward
-  sleep(2);
-
-  // Test stopping without brake mode
-  fprintf(stderr, "Testing stop without brake mode...\n");
-  BT_motor_port_stop(MOTOR_A | MOTOR_C, 0);  // Stop motors A and B without active brake
-  sleep(1);
-
   // Test reading RGB color sensor
-  fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
+  fprintf(stderr, "Initial color scan: Testing NXT color sensor (RGB raw)...\n");
   int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
-    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = get_color_from_rgb(R, G, B, A);
-    switch (color) {
-      case 0:
-        fprintf(stderr, "Detected color: Red\n");
-        break;
-      case 1:
-        fprintf(stderr, "Detected color: Yellow\n");
-        break;
-      case 2:
-        fprintf(stderr, "Detected color: Green\n");
-        break;
-      case 3:
-        fprintf(stderr, "Detected color: Blue\n");
-        break;
-      case 4:
-        fprintf(stderr, "Detected color: Black\n");
-        break;
-      case 5:
-        fprintf(stderr, "Detected color: White\n");
-        break;
-      default:
-        fprintf(stderr, "Detected color: Other\n");
-        break;
+  for (int i = 0; i < 10; i++) {
+    if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) == 1) {
+      fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d)\n", i, R, G, B, A, R + A, G + A, B + A);
     }
-  } else {
-    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
   }
 
-  // Test reading gyro sensor and turning right 90 degrees
-  fprintf(stderr, "Testing gyro sensor for 90-degree turn...\n");
-  int angle = 0, rate = 0;
-
-  // Reset gyro sensor to zero
-  if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
-    fprintf(stderr, "Failed to reset gyro sensor.\n");
-  } else {
-    // Start turning right
-    BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
-
-    // Monitor the angle until it reaches 90 degrees
-    while (angle < 90) {
-      if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
-        fprintf(stderr, "Failed to read gyro sensor.\n");
-        break;
-      }
-      fprintf(stderr, "Current angle: %d\n", angle);
-    }
-
-    // Stop the motors
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
-  }
+  int tl, tr, tb, tt;
+  scan_intersection(&tl, &tr, &tb, &tt);
 
   BT_close();
   fprintf(stderr, "Done!\n");
-}
-
-int get_color_from_rgb(int R, int G, int B, int A) {
-  // Thresholds for color detection
-  const int RED_THRESHOLD = 200;
-  const int GREEN_THRESHOLD = 200;
-  const int BLUE_THRESHOLD = 200;
-  const int BLACK_THRESHOLD = 50;
-  const int WHITE_THRESHOLD = 600;
-
-  int brightness = R + G + B;
-
-  if (brightness < BLACK_THRESHOLD || A > 80) {
-    return 4;  // Black
-  } else if (brightness > WHITE_THRESHOLD || A < 10) {
-    return 5;  // White
-  } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 0;  // Red
-  } else if (R > RED_THRESHOLD && G > GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 1;  // Yellow
-  } else if (G > GREEN_THRESHOLD && R < RED_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 2;  // Green
-  } else if (B > BLUE_THRESHOLD && R < RED_THRESHOLD && G < GREEN_THRESHOLD) {
-    return 3;  // Blue
-  } else {
-    return 6;  // Other
-  }
 }
