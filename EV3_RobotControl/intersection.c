@@ -10,9 +10,9 @@
 #define MOTOR_LEFT  MOTOR_A
 #define MOTOR_RIGHT MOTOR_C
 
-#define DEG_STEP   30.0      // 每段角度
-#define WINDOW     6.0       // 判定窗口 ±3°
-#define N_SAMPLES  12        // 12 段
+#define DEG_STEP   30.0      
+#define WINDOW     6.0     
+#define N_SAMPLES  12     
 
 
 //(-180,180]
