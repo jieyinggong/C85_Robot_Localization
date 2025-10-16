@@ -1,0 +1,245 @@
+#include "street.h"
+#include "color.h"
+#include "btcomm.h"
+#include <time.h>
+#include <stdbool.h>
+
+void verify_and_recorrect_internal(int depth)
+{
+    int R = 0, G = 0, B = 0, A = 0;
+    int color_forward = -1, color_backward = -1;
+
+    printf("[Verify #%d] Checking color consistency around final position...\n", depth);
+
+    // forward
+    BT_timed_motor_port_start(MOTOR_A, 7, 80, 1000, 80);
+    BT_timed_motor_port_start(MOTOR_C, 6, 100, 1000, 100);
+    sleep(2);
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    color_forward = classify_color_hsv_from_values(R, G, B, A, false);
+    printf("[Verify #%d] Forward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_forward, R, G, B, A);
+
+    // back
+    BT_timed_motor_port_start(MOTOR_A, -7, 80, 1000, 80);
+    BT_timed_motor_port_start(MOTOR_C, -6, 100, 1000, 100);
+    sleep(2);
+
+    BT_timed_motor_port_start(MOTOR_A, -7, 80, 1000, 80);
+    BT_timed_motor_port_start(MOTOR_C, -6, 100, 1000, 100);
+    sleep(2);
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    color_backward = classify_color_hsv_from_values(R, G, B, A, false);
+    printf("[Verify #%d] Backward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_backward, R, G, B, A);
+    BT_timed_motor_port_start(MOTOR_A, 7, 80, 1000, 80);
+    BT_timed_motor_port_start(MOTOR_C, 6, 100, 1000, 100);
+    sleep(2);
+
+    // If either reading is not black/yellow, or they disagree, do another correction
+    if (!(color_forward == 5 && color_backward == 5) &&
+        !(color_forward == 1 && color_backward == 1) &&
+        !(color_forward == 5 && color_backward == 1) &&
+        !(color_forward == 1 && color_backward == 5))
+    {
+        printf("[Verify #%d] Not stable — re-correction triggered.\n", depth);
+         BT_turn(MOTOR_A, 0, MOTOR_C, 10);
+         sleep(1);
+          BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        if (depth < 5) // limit max recursion depth
+        {
+            recorrect_to_black_internal(depth + 1);
+        }
+        else
+        {
+            printf("[Verify] Max recursion depth reached, stopping further correction.\n");
+        }
+    }
+    else
+    {
+        printf("[Verify #%d] Both sides confirmed on black — correction stable.\n", depth);
+    }
+}
+
+
+void recorrect_to_black_internal(int depth)
+{
+    int R = 0, G = 0, B = 0, A = 0;
+    int color = -1;
+    int angle = 0, rate = 0;
+    const int BASE_TIME = 1500;
+    const double GYRO_SCALE = 1.0 / 60.0;
+
+    printf("[Correction #%d] Starting adaptive correction loop...\n", depth);
+
+    BT_read_gyro(PORT_2, 1, &angle, &rate);
+
+    while (1)
+    {
+        BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+        color = classify_color_hsv_from_values(R, G, B, A, false);
+
+        if (color == 5 || color == 1)
+        {
+            printf("[Correction #%d] Reacquired black line.\n", depth);
+            BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+            break;
+        }
+
+        printf("[Correction #%d] Off street (color=%d) — correcting.\n", depth, color);
+
+        // Backward (angle compensation)
+        BT_read_gyro(PORT_2, 0, &angle, &rate);
+        double theta = fabs(angle);
+        double back_factor = 1.0 + theta * GYRO_SCALE;
+        int back_time = (int)(BASE_TIME * back_factor);
+
+        BT_timed_motor_port_start(MOTOR_A, -7, 80, back_time, 80);
+        BT_timed_motor_port_start(MOTOR_C, -6, 100, back_time, 100);
+        sleep(3);
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        // Rotate
+        BT_read_gyro(PORT_2, 1, &angle, &rate);
+        int dir = 1;
+        BT_turn(MOTOR_A, 0, MOTOR_C, 10 * dir);
+        sleep(1);
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        // Forward (angle compensation)
+        BT_read_gyro(PORT_2, 0, &angle, &rate);
+        double fwd_factor = 1.0 + fabs(angle) * (GYRO_SCALE * 0.8);
+        int fwd_time = (int)(BASE_TIME * fwd_factor);
+        BT_timed_motor_port_start(MOTOR_A, 7, 80, fwd_time, 80);
+        BT_timed_motor_port_start(MOTOR_C, 6, 100, fwd_time, 100);
+        sleep(3);
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        sleep(1);
+    }
+
+    printf("[Correction #%d] Completed — back on street.\n", depth);
+    verify_and_recorrect_internal(depth); 
+  }
+
+// External interface (unified entry point)
+void recorrect_to_black(void)
+{
+    recorrect_to_black_internal(1);
+}
+
+
+int find_street(void)
+{
+    int color = -1;
+    int outcome = 0;
+
+    srand(time(NULL));  // random seed once
+
+    int R, G, B, A;
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    color = classify_color_hsv_from_values(R, G, B, A, false);
+    printf("First Color detected: %d\n", color);
+    sleep(1);
+    if (color == 5) // Black
+    {
+        printf("Street found!\n");
+        return 1;
+    }
+
+    while (1)
+    {
+        // Read color sensor
+        int R, G, B, A;
+        BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+        color = classify_color_hsv_from_values(R, G, B, A, false);
+        printf("Color detected: %d\n", color);
+
+        if (color == 5) // Black
+        {
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+        printf("Street found!\n");
+        outcome = 1;
+        break;
+        }
+
+        // Detect red (border)
+        if (color == 0)
+        {
+            printf("Border detected! Backing up...\n");
+            BT_drive(MOTOR_A, MOTOR_C, -24, -20);
+            sleep(3);
+            BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+            // Turn away from border
+            int angle = (rand() % 120) + 60; // 60°–180° turn
+            int dir = (rand() % 2) ? 1 : -1; // random left/right
+            BT_turn(MOTOR_A, 30 * dir, MOTOR_C, -30 * dir);
+            sleep(3); // crude rotation timing
+            BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+            continue;
+        }
+
+        // Keep moving forward in small steps
+        BT_drive(MOTOR_A, MOTOR_C, 0, 10);
+        sleep(1);
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+    }
+
+    return outcome;
+}
+
+int drive_along_street(void)
+{
+ /*
+  * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
+  * the map. It stops at an intersection.
+  * 
+  * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
+  * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
+  * or the course instructor for help carrying out your plan.
+  * 
+  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
+  * bot after calling this function.
+  */   
+
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+
+  // Test stopping with brake mode
+  // stop when detect intersection
+  if (detect_intersection()) {
+    fprintf(stderr, "Detected intersection, stopping...\n");
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+    sleep(1);
+    return 1; // Successfully reached an intersection
+  }
+
+  return(0);
+}
+
+int detect_intersection(void)
+{
+ /*
+  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
+  * you like, but it should be reliable and robust.
+  * 
+  * The return value should be 1 if an intersection is detected, and 0 otherwise.
+  */   
+  // use this function: classify_color_hsv_from_values(int R, int G, int B, int A, bool color);
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = classify_color_hsv_from_values(R, G, B, A, false);
+    if (color == 1) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
+}

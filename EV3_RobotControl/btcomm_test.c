@@ -20,7 +20,9 @@
 // from the NXT to the EV3!
 
 #include "btcomm.h"
-#include "ev3.h"
+#include "street.h"
+#include "color.h"
+#include "intersection.h"
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
@@ -87,11 +89,11 @@ int main(int argc, char *argv[]) {
 
   memset(&reply[0], 0, 1024);
 
-// just uncomment your bot's hex key to compile for your bot, and comment the
-// other ones out.
-#ifndef HEXKEY
-#define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
-#endif
+  // just uncomment your bot's hex key to compile for your bot, and comment the
+  // other ones out.
+  #ifndef HEXKEY
+  #define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
+  #endif
 
   BT_open(HEXKEY);
 
@@ -99,108 +101,72 @@ int main(int argc, char *argv[]) {
   // max name length is 12 characters
   BT_setEV3name("R2D2");
 
-  //BT_play_tone_sequence(tone_data);
+  // 1. starting sound
+  BT_play_tone_sequence(tone_data);
   sleep(1);
-  // BT_play_tone_sequence(TONE_GREEN);
-  // sleep(1);
-  // BT_play_tone_sequence(TONE_BLUE);
-  // sleep(1);
-  // BT_play_tone_sequence(TONE_WHITE);
-  // sleep(1);
-  // BT_play_tone_sequence(TONE_INTERSECTION);
-  // sleep(1);
-  // BT_play_tone_sequence(TONE_LOCALIZATION_DONE);
 
-  // test find_street function
+  // 2. find street (assume robot is on random place on map)
+  int success = find_street();
+  if (success) {
+    fprintf(stderr, "Street found, now correcting...\n");
+  }
+
+  // correct to black line
   recorrect_to_black();
-  
-  // if (find_street()) 
-  // {
-  //   fprintf(stderr, "Street found!\n");
-  // }
 
-  // // Test driving forward
-  // fprintf(stderr, "Testing drive forward...\n");
-  // BT_drive(MOTOR_A, MOTOR_C, 12, 10);
-  // sleep(8);  // Drive for 4 seconds
+  // 3. drive along street until intersection
+  success = drive_along_street();
+  if (success) {
+    fprintf(stderr, "Reached intersection!\n");
+    BT_play_tone_sequence(TONE_INTERSECTION);
+    sleep(1);
+  }
 
-  // // Test stopping with brake mode
-  // fprintf(stderr, "Testing stop with brake mode...\n");
-  // BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
-  // sleep(1);
+  // 4. scan intersection
+  int tl, tr, br, bl;
+  success = scan_intersection(&tl, &tr, &br, &bl);
+  if (success) {
+    fprintf(stderr, "Scan complete! Colours: TL=%d, TR=%d, BR=%d, BL=%d\n", tl, tr, br, bl);
+    // play tones in sequence for tl, tr, br, bl
+    // play tone for tl
+    if (tl == 2) BT_play_tone_sequence(TONE_GREEN);
+    else if (tl == 3) BT_play_tone_sequence(TONE_BLUE);
+    else if (tl == 5) BT_play_tone_sequence(TONE_WHITE);
+    else BT_play_tone_sequence(tone_data);
+    sleep(2);
+    // play tone for tr
+    if (tr == 2) BT_play_tone_sequence(TONE_GREEN);
+    else if (tr == 3) BT_play_tone_sequence(TONE_BLUE);
+    else if (tr == 5) BT_play_tone_sequence(TONE_WHITE);
+    else BT_play_tone_sequence(tone_data);
+    sleep(2);
+    // play tone for br
+    if (br == 2) BT_play_tone_sequence(TONE_GREEN);
+    else if (br == 3) BT_play_tone_sequence(TONE_BLUE); 
+    else if (br == 5) BT_play_tone_sequence(TONE_WHITE);
+    else BT_play_tone_sequence(tone_data);
+    sleep(2);
+    // play tone for bl
+    if (bl == 2) BT_play_tone_sequence(TONE_GREEN);
+    else if (bl == 3) BT_play_tone_sequence(TONE_BLUE);
+    else if (bl == 5) BT_play_tone_sequence(TONE_WHITE);
+    else BT_play_tone_sequence(tone_data);
+    sleep(2);
+  }
 
-  // // Test turning right
-  // fprintf(stderr, "Testing turn right...\n");
-  // BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn left by running motor A forward and motor B backward
-  // sleep(2);
+  // 5. turn right at intersection
 
-  // // Test turning left
-  // fprintf(stderr, "Testing turn left...\n");
-  // BT_turn(MOTOR_A, -50, MOTOR_C, 50);  // Turn right by running motor A backward and motor C forward
-  // sleep(2);
+  // 6. keep going... (drive along street until next intersection)
+  success = drive_along_street();
+  if (success) {
+    fprintf(stderr, "Reached intersection again!\n");
+    BT_play_tone_sequence(TONE_INTERSECTION);
+    sleep(1);
+  }
 
-  // // Test stopping without brake mode
-  // fprintf(stderr, "Testing stop without brake mode...\n");
-  // BT_motor_port_stop(MOTOR_A | MOTOR_C, 0);  // Stop motors A and B without active brake
-  // sleep(1);
+  // 7. turn left at intersection
 
-  // // Test reading RGB color sensor
-  // fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
-  // int R, G, B, A;
-  // if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
-  //   fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-  //   int color = get_color_from_rgb(R, G, B, A);
-  //   switch (color) {
-  //     case 0:
-  //       fprintf(stderr, "Detected color: Red\n");
-  //       break;
-  //     case 1:
-  //       fprintf(stderr, "Detected color: Yellow\n");
-  //       break;
-  //     case 2:
-  //       fprintf(stderr, "Detected color: Green\n");
-  //       break;
-  //     case 3:
-  //       fprintf(stderr, "Detected color: Blue\n");
-  //       break;
-  //     case 4:
-  //       fprintf(stderr, "Detected color: Black\n");
-  //       break;
-  //     case 5:
-  //       fprintf(stderr, "Detected color: White\n");
-  //       break;
-  //     default:
-  //       fprintf(stderr, "Detected color: Other\n");
-  //       break;
-  //   }
-  // } else {
-  //   fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-  // }
-
-  // // Test reading gyro sensor and turning right 90 degrees
-  // fprintf(stderr, "Testing gyro sensor for 90-degree turn...\n");
-  // int angle = 0, rate = 0;
-
-  // // Reset gyro sensor to zero
-  // if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
-  //   fprintf(stderr, "Failed to reset gyro sensor.\n");
-  // } else {
-  //   // Start turning right
-  //   BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
-
-  //   // Monitor the angle until it reaches 90 degrees
-  //   while (angle < 90) {
-  //     if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
-  //       fprintf(stderr, "Failed to read gyro sensor.\n");
-  //       break;
-  //     }
-  //     fprintf(stderr, "Current angle: %d\n", angle);
-  //   }
-
-  //   // Stop the motors
-  //   BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
-  // }
-
+  // 7. done
   BT_close();
   fprintf(stderr, "Done!\n");
 }
