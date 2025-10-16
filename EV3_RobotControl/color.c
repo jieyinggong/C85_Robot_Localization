@@ -1,6 +1,10 @@
 #include <stdbool.h>
 #include <math.h>
 #include "color.h"
+#include <stdio.h>
+#include "btcomm.h"
+
+int colors[6][3];
 
 int classify_color_hsv_from_values(int R, int G, int B, int A, bool color)
 {
@@ -91,3 +95,72 @@ void rgba_to_hsv(int R, int G, int B, int A, double *H, double *S, double *V)
     if (S) *S = s;
     if (V) *V = v;
 }
+
+// write a function that use euclidean distance to find the nearest color in the colors array
+
+// void read_color_calibration()
+// {
+//   FILE *fp = fopen("color_calibration.txt", "r");
+//   if (fp == NULL) {
+//     fprintf(stderr, "Failed to open file for reading color calibration.\n");
+//     return;
+//   }
+
+//   char line[100];
+//   int idx = 0;
+//   while (fgets(line, sizeof(line), fp)) {
+//     fprintf(stderr, "%s", line); // Print each line read from the file
+//     sscanf(line, "Color %d average RGB = (%d, %d, %d)", &idx, &colors[idx][0], &colors[idx][1], &colors[idx][2]);
+//   }
+
+//   fclose(fp);
+// }
+
+// use read_color_calibration() to read the color calibration data from color_calibration.txt
+// and store it in the global array colors[6][3]
+
+
+void read_color_calibration()
+{
+  FILE *fp = fopen("color_calibration.txt", "r");
+  if (fp == NULL) {
+    fprintf(stderr, "Failed to open file for reading color calibration.\n");
+    return;
+  }
+
+  char line[100];
+  int idx = 0;
+  while (fgets(line, sizeof(line), fp)) {
+    // fprintf(stderr, "%s", line); // Print each line read from the file
+    sscanf(line, "Color %d average RGB = (%d, %d, %d)", &idx, &colors[idx][0], &colors[idx][1], &colors[idx][2]);
+    fprintf(stderr, "Loaded Color %d average RGB = (%d, %d, %d)\n", idx, colors[idx][0], colors[idx][1], colors[idx][2]);
+    idx++;
+  }
+
+  fclose(fp);
+}
+
+int classify_color_euclidean(int R, int G, int B, int A)
+{
+    int adjR = R + A;
+    int adjG = G + A;
+    int adjB = B + A;
+
+    int min_index = -1;
+    double min_dist = 1e9;
+
+    for (int i = 0; i < 6; i++) {
+        double dR = adjR - colors[i][0];
+        double dG = adjG - colors[i][1];
+        double dB = adjB - colors[i][2];
+        double dist = sqrt(dR * dR + dG * dG + dB * dB);
+
+        if (dist < min_dist) {
+            min_dist = dist;
+            min_index = i;
+        }
+    }
+
+    return min_index;
+}
+

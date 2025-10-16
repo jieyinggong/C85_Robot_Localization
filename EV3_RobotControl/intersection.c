@@ -36,7 +36,7 @@ int get_region(double angle) {
     else return 3;
 }
 
-// 0: Red, 1: Yellow, 2: Green, 3: Blue, 4: Black, 5: White, 6: Other
+// 0: Red, 1: Yellow, 2: Green, 3: Blue, 4: White, 5: Black, 6: Other
 int scan_intersection(int *tl, int *tr, int *br, int *bl)
 {
     sleep(1);
@@ -86,7 +86,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         {
             int R, G, B, A;
             if (BT_read_colour_RGBraw_NXT(PORT_COLOR, &R, &G, &B, &A) == 1) {
-                start_color = classify_color_hsv_from_values(R, G, B, A, false);
+                start_color = classify_color_euclidean(R, G, B, A);
                 fprintf(stderr, "Start color scan: RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d), color index = %d\n",
                         R, G, B, A, R + A, G + A, B + A, start_color);
             } else {
@@ -194,9 +194,9 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         // Print all collected samples
         fprintf(stderr, "Right turn samples:\n");
         for (int i = 0; i < N_SAMPLES; ++i) {
-            color_indices_right[i] = classify_color_hsv_from_values(
+            color_indices_right[i] = classify_color_euclidean(
             color_samples_right[i][0], color_samples_right[i][1],
-            color_samples_right[i][2], color_samples_right[i][3], true);
+            color_samples_right[i][2], color_samples_right[i][3]);
 
             fprintf(stderr, "Sample #%d (%.1f°): RGB = (%d, %d, %d, A=%d) and adjusted RGB = (%d, %d, %d, A=%d) and color index = %d\n",
                 i, sampled_right[i], color_samples_right[i][0], color_samples_right[i][1],
@@ -208,9 +208,9 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
         fprintf(stderr, "Left turn samples:\n");
         for (int i = 0; i < N_SAMPLES; ++i) {
-            color_indices_left[N_SAMPLES - 1 - i] = classify_color_hsv_from_values(
+            color_indices_left[N_SAMPLES - 1 - i] = classify_color_euclidean(
             color_samples_left[i][0], color_samples_left[i][1],
-            color_samples_left[i][2], color_samples_left[i][3], true);
+            color_samples_left[i][2], color_samples_left[i][3]);
 
             fprintf(stderr, "Sample #%d (%.1f°): RGB = (%d, %d, %d, A=%d) and adjusted RGB = (%d, %d, %d, A=%d) and color index = %d\n",
                 i, sampled_left[i], color_samples_left[i][0], color_samples_left[i][1],
@@ -366,7 +366,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                         } 
                         int R, G, B, A;
                         if (BT_read_colour_RGBraw_NXT(PORT_COLOR, &R, &G, &B, &A) == 1) {
-                            int exact_color = classify_color_hsv_from_values(R, G, B, A, true);
+                            int exact_color = classify_color_euclidean(R, G, B, A);
                             double weight = 20.0; // Assign a high weight for this exact check
                             color_vote[region][exact_color] += weight;
 
@@ -382,7 +382,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     double max_votes = 0;
                     int best_color = 6; // Default to UNKNOWN
                     for (int color = 0; color < 7; ++color) {
-                        if ((color == 3 || color == 2 || color == 4) && color_vote[region][color] > max_votes) {
+                        if ((color == 1 || color == 4 || color == 5) && color_vote[region][color] > max_votes) {
                             max_votes = color_vote[region][color];
                             best_color = color;
                         }
