@@ -32,6 +32,8 @@ int find_street(void)
 {
     int color = -1;
     int outcome = 0;
+    const int  BLACK_STABILITY   = 2;
+    const int  NONBLACK_DEBOUNCE = 2; 
 
     srand(time(NULL));  // random seed once
 
@@ -58,6 +60,87 @@ int find_street(void)
         {
         BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
         printf("Street found!\n");
+        while (1) {
+        // 1) Drive forward while we remain on black (with a little stability to avoid flicker)
+        int black_run_confirm = 0;
+        BT_drive(MOTOR_A, MOTOR_C, 8, 7);
+
+        while (1) {
+            BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+            color = classify_color_hsv_from_values(R, G, B, A);
+
+            if (color == 5) {
+                // still black
+                if (black_run_confirm < BLACK_STABILITY) black_run_confirm++;
+            } else {
+                // potential exit from black; require a few consecutive reads
+                int nonblack_cnt = 0;
+                for (int i = 0; i < NONBLACK_DEBOUNCE; i++) {
+                    sleep(2);
+                    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+                    int c2 = classify_color_hsv_from_values(R, G, B, A);
+                    if (c2 != 5) nonblack_cnt++;
+                }
+                if (nonblack_cnt >= NONBLACK_DEBOUNCE) {
+                    break; // left black for sure
+                }
+            }
+            sleep(2);
+        }
+
+        // We just left black; stop now
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        // 2) Decide based on the new color
+        BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+        color = classify_color_hsv_from_values(R, G, B, A);
+        printf("Left black, color now: %d\n", color);
+
+        if (color == 1) {
+            // Yellow intersection found
+            printf("Yellow tile detected — success.\n");
+            outcome = 1;
+            break;
+        }
+
+        if (color == 0) {
+            // Red border — back up and turn away more aggressively
+            printf("Red border — back & turn away.\n");
+            BT_drive(MOTOR_A, MOTOR_C, 8, 7);
+            sleep(4);
+            BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+            int dir = (rand() % 2) ? 1 : -1;
+            BT_turn(MOTOR_A, 12, MOTOR_C, -12);
+            sleep(2);
+            BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+            // Continue loop (re-enter forward-while-black on next pass)
+            continue;
+        }
+
+        // Any other color (white/green/blue/unknown):
+        // Back a little to return to the last black position, do a small corrective rotate,
+        // and push forward again to re-capture the black street.
+        printf("Off street (color=%d) — correcting.\n", color);
+
+        // Back up
+        BT_drive(MOTOR_A, MOTOR_C, 8, 7);
+        sleep(4);
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        // Small corrective rotate (alternate or random)
+        int dir = (rand() % 2) ? 1 : -1;  // random left/right nudge
+        BT_turn(MOTOR_A, 12 * dir, MOTOR_C, -12 * dir);
+        sleep(2);
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        // Short forward push to re-acquire black quickly
+        BT_drive(MOTOR_A, MOTOR_C, 8, 7);
+        sleep(2);
+        BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+        // Now the loop repeats: we’ll drive while black, exit, evaluate, etc.
+    }
         outcome = 1;
         break;
         }
@@ -87,6 +170,149 @@ int find_street(void)
 
     return outcome;
 }
+
+// int find_street(void)
+// {
+//     // ---- Tunables for 1-second granularity ----
+//     const int FWD_L_PWR = 10, FWD_R_PWR = 9;   // gentle forward
+//     const int REV_L_PWR = -12, REV_R_PWR = -12; // consistent backup
+//     const int TURN_PWR  = 14;                  // small corrective spin
+//     const int STEP_FWD_S   = 1;                // 1s forward steps
+//     const int POLL_S       = 1;                // sensor poll cadence
+//     const int BACK_S       = 1;                // 1s back-up
+//     const int ROTATE_S     = 1;                // ~1s rotate nudge
+//     const int NONBLACK_DEBOUNCE = 2;           // need 2 consecutive non-black reads
+//     const int BLACK_STABILITY   = 2;           // see black in 2 consecutive reads
+
+//     int R=0, G=0, B=0, A=0;
+//     int color = -1;
+//     int outcome = 0;
+
+//     static int seeded = 0; if (!seeded) { srand((unsigned)time(NULL)); seeded = 1; }
+
+//     // ---- Initial read
+//     BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+//     color = classify_color_hsv_from_values(R, G, B, A);
+//     printf("First Color detected: %d\n", color);
+//     sleep(1);
+//     if (color == 5) {
+//         printf("Street found!\n");
+//         return 1;
+//     }
+
+//     // ---- SEARCH: step forward until we find black (avoid red)
+//     printf("Searching for street...\n");
+//     while (1) {
+//         // step forward a bit
+//         BT_drive(MOTOR_A, MOTOR_C, FWD_L_PWR, FWD_R_PWR);
+//         sleep(STEP_FWD_S);
+//         BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+//         // read color
+//         BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+//         color = classify_color_hsv_from_values(R, G, B, A);
+//         printf("Search color: %d\n", color);
+
+//         if (color == 0) {
+//             // red border: back up & turn away
+//             printf("Border during search — back & turn.\n");
+//             BT_drive(MOTOR_A, MOTOR_C, REV_L_PWR, REV_R_PWR);
+//             sleep(BACK_S);
+//             BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+//             int dir = (rand() % 2) ? 1 : -1;
+//             BT_turn(MOTOR_A, TURN_PWR * dir, MOTOR_C, -TURN_PWR * dir);
+//             sleep(ROTATE_S);
+//             BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+//             continue;
+//         }
+
+//         if (color == 5) {
+//             printf("Street found — starting follow loop.\n");
+//             break;
+//         }
+//     }
+
+//     // ---- FOLLOW: move along black until we reach yellow
+//     while (1) {
+//         // Drive forward while we keep seeing black (with stability)
+//         int black_ok = 0;
+//         BT_drive(MOTOR_A, MOTOR_C, FWD_L_PWR, FWD_R_PWR);
+
+//         while (1) {
+//             BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+//             color = classify_color_hsv_from_values(R, G, B, A);
+
+//             if (color == 5) {
+//                 if (black_ok < BLACK_STABILITY) black_ok++;
+//             } else {
+//                 // confirm we really left black
+//                 int nonblack_cnt = 0;
+//                 for (int i = 0; i < NONBLACK_DEBOUNCE; i++) {
+//                     sleep(POLL_S);
+//                     BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+//                     int c2 = classify_color_hsv_from_values(R, G, B, A);
+//                     if (c2 != 5) nonblack_cnt++;
+//                 }
+//                 if (nonblack_cnt >= NONBLACK_DEBOUNCE) {
+//                     break; // left black for sure
+//                 }
+//             }
+//             sleep(POLL_S);
+//         }
+
+//         // left black — stop where we are
+//         BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+//         // read the new tile color
+//         BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+//         color = classify_color_hsv_from_values(R, G, B, A);
+//         printf("Left black, color now: %d\n", color);
+
+//         if (color == 1) {
+//             // Yellow intersection found
+//             printf("Yellow tile detected — success.\n");
+//             outcome = 1;
+//             break;
+//         }
+
+//         if (color == 0) {
+//             // Red border — back & stronger turn
+//             printf("Red border — back & turn away.\n");
+//             BT_drive(MOTOR_A, MOTOR_C, REV_L_PWR, REV_R_PWR);
+//             sleep(BACK_S);
+//             BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+//             int dir = (rand() % 2) ? 1 : -1;
+//             BT_turn(MOTOR_A, (TURN_PWR + 4) * dir, MOTOR_C, -(TURN_PWR + 4) * dir);
+//             sleep(ROTATE_S);
+//             BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+//             continue;
+//         }
+
+//         // Other color (white/green/blue/unknown): self-correct
+//         printf("Off street (color=%d) — correcting.\n", color);
+
+//         // Back to last black region
+//         BT_drive(MOTOR_A, MOTOR_C, REV_L_PWR, REV_R_PWR);
+//         sleep(BACK_S);
+//         BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+//         // Small corrective rotate (random side)
+//         int dir = (rand() % 2) ? 1 : -1;
+//         BT_turn(MOTOR_A, TURN_PWR * dir, MOTOR_C, -TURN_PWR * dir);
+//         sleep(ROTATE_S);
+//         BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+
+//         // Short forward push to re-acquire black quickly
+//         BT_drive(MOTOR_A, MOTOR_C, FWD_L_PWR, FWD_R_PWR);
+//         sleep(STEP_FWD_S);
+//         BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
+//         // Loop will continue and re-enter the “drive while black” phase
+//     }
+
+//     return outcome;
+// }
 
 // Returns: 0=RED, 1=YELLOW, 2=GREEN, 3=BLUE, 4=WHITE, 5=BLACK, -1=UNKNOWN
 int classify_color_hsv_from_values(int R, int G, int B, int A)
