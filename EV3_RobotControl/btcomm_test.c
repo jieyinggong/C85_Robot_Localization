@@ -21,6 +21,7 @@
 
 #include "btcomm.h"
 #include "intersection.h"
+#include <stdbool.h>
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
@@ -61,14 +62,17 @@ int main(int argc, char *argv[]) {
   // max name length is 12 characters
   //BT_setEV3name("R2D2");
 
-  BT_play_tone_sequence(tone_data);
+  sleep(5);
+  fprintf(stderr, "start...\n");
+
+  // BT_play_tone_sequence(tone_data);
 
   // Test reading RGB color sensor
   fprintf(stderr, "Initial color scan: Testing NXT color sensor (RGB raw)...\n");
   int R, G, B, A;
   for (int i = 0; i < 10; i++) {
     if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) == 1) {
-      fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d)\n", i, R, G, B, A, R + A, G + A, B + A);
+      fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d) and color index = %d\n", i, R, G, B, A, R + A, G + A, B + A, classify_color_hsv_from_values(R, G, B, A, false));
     }
   }
 
