@@ -101,21 +101,21 @@ int main(int argc, char *argv[]) {
 
   BT_play_tone_sequence(tone_data);
   sleep(1);
-  BT_play_tone_sequence(TONE_GREEN);
-  sleep(1);
-  BT_play_tone_sequence(TONE_BLUE);
-  sleep(1);
-  BT_play_tone_sequence(TONE_WHITE);
-  sleep(1);
-  BT_play_tone_sequence(TONE_INTERSECTION);
-  sleep(1);
-  BT_play_tone_sequence(TONE_LOCALIZATION_DONE);
+  // BT_play_tone_sequence(TONE_GREEN);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_BLUE);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_WHITE);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_INTERSECTION);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_LOCALIZATION_DONE);
 
-  // // test find_street function
-  // if (find_street()) 
-  // {
-  //   fprintf(stderr, "Street found!\n");
-  // }
+  // test find_street function
+  if (find_street()) 
+  {
+    fprintf(stderr, "Street found!\n");
+  }
 
   // // Test driving forward
   // fprintf(stderr, "Testing drive forward...\n");

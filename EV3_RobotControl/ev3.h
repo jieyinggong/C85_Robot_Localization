@@ -13,5 +13,7 @@
 
 int get_color_from_rgb(int R, int G, int B, int A);
 int find_street(void);
+int classify_color_hsv_from_values(int R, int G, int B, int A);
+void rgba_to_hsv(int R, int G, int B, int A, double *H, double *S, double *V);
 
 #endif
