@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
   // max name length is 12 characters
   BT_setEV3name("R2D2");
 
-  BT_play_tone_sequence(tone_data);
+  //BT_play_tone_sequence(tone_data);
   sleep(1);
   // BT_play_tone_sequence(TONE_GREEN);
   // sleep(1);
@@ -112,10 +112,12 @@ int main(int argc, char *argv[]) {
   // BT_play_tone_sequence(TONE_LOCALIZATION_DONE);
 
   // test find_street function
-  if (find_street()) 
-  {
-    fprintf(stderr, "Street found!\n");
-  }
+  recorrect_to_black();
+  
+  // if (find_street()) 
+  // {
+  //   fprintf(stderr, "Street found!\n");
+  // }
 
   // // Test driving forward
   // fprintf(stderr, "Testing drive forward...\n");
