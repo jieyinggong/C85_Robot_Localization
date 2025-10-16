@@ -39,6 +39,7 @@ int get_region(double angle) {
 // 0: Red, 1: Yellow, 2: Green, 3: Blue, 4: Black, 5: White, 6: Other
 int scan_intersection(int *tl, int *tr, int *br, int *bl)
 {
+    sleep(1);
    // intialize gyro sensor
    int ref_angle = 0, rate = 0;
     if (BT_read_gyro(PORT_GYRO, 1, &ref_angle, &rate) != 1) {
@@ -50,12 +51,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
     sleep(1); // Wait a moment for the gyro to stabilize
     // drive forwarde to the start point of scan
-    BT_timed_motor_port_start(MOTOR_A, 7, 80, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(MOTOR_C, 6, 100, 1380, 100); // Start motor C with power 6, ramp up time 500ms
+    BT_timed_motor_port_start(MOTOR_A, 7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+    BT_timed_motor_port_start(MOTOR_C, 6, 120, 1380, 100); // Start motor C with power 6, ramp up time 500ms
    // BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
     fprintf(stderr, "Drive forward to start point of scan.\n");
     sleep(3); // Wait for the bot to reach the start point
-    sleep(1); // wait for a while
     // ADD A ANGLE CHECK HERE TO ENSURE IT IS STRAIGHT
       int  current_angle = 0, current_rate = 0;
     if (BT_read_gyro(PORT_GYRO, 0, &current_angle, &current_rate) != 1) {
@@ -424,11 +424,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         fprintf(stderr, "Scan complete.\n");
 
     // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
-    *(tl)=-1;
-    *(tr)=-1;
-    *(br)=-1;
-    *(bl)=-1;
+    *(tl)=region_color[3];
+    *(tr)=region_color[0];
+    *(br)=region_color[1];
+    *(bl)=region_color[2];
 
-    return(0);
+    return 1; // success
  
 }

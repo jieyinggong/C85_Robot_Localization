@@ -60,7 +60,6 @@ void verify_and_recorrect_internal(int depth)
     }
 }
 
-
 void recorrect_to_black_internal(int depth)
 {
     int R = 0, G = 0, B = 0, A = 0;
@@ -89,8 +88,10 @@ void recorrect_to_black_internal(int depth)
 
         // Backward (angle compensation)
         BT_read_gyro(PORT_2, 0, &angle, &rate);
-        double theta = fabs(angle);
-        double back_factor = 1.0 + theta * GYRO_SCALE;
+        double theta_b = fabs(angle);
+        if (theta_b > 180) theta_b = 360 - theta_b;  // wrap to [0,180]
+        double theta_rad_b = theta_b * M_PI / 180.0;
+        double back_factor = 1.0 + sin(theta_rad_b) * GYRO_SCALE;
         int back_time = (int)(BASE_TIME * back_factor);
 
         BT_timed_motor_port_start(MOTOR_A, -7, 80, back_time, 80);
@@ -107,7 +108,10 @@ void recorrect_to_black_internal(int depth)
 
         // Forward (angle compensation)
         BT_read_gyro(PORT_2, 0, &angle, &rate);
-        double fwd_factor = 1.0 + fabs(angle) * (GYRO_SCALE * 0.8);
+        double theta_f = fabs(angle);
+        if (theta_f > 180) theta_f = 360 - theta_f;  // wrap to [0,180]
+        double theta_rad_f = theta_f * M_PI / 180.0;
+        double fwd_factor = 1.0 + sin(theta_rad_f) * GYRO_SCALE;
         int fwd_time = (int)(BASE_TIME * fwd_factor);
         BT_timed_motor_port_start(MOTOR_A, 7, 80, fwd_time, 80);
         BT_timed_motor_port_start(MOTOR_C, 6, 100, fwd_time, 100);
@@ -138,7 +142,7 @@ int find_street(void)
     int R, G, B, A;
     BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
     color = classify_color_hsv_from_values(R, G, B, A, false);
-    printf("First Color detected: %d\n", color);
+    printf("First Color detected with RGB(%d, %d, %d, %d): %d\n", R, G, B, A, color);
     sleep(1);
     if (color == 5) // Black
     {
@@ -236,6 +240,24 @@ int detect_intersection(void)
       return 1;
     } else {
       fprintf(stderr, "Not an intersection\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
+}
+
+int detect_intersection_or_street(void){
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = classify_color_hsv_from_values(R, G, B, A, false);
+    if (color == 1 || color == 5) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow) or Street (Black)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection or street\n");
       return 0;
     }
   } else {

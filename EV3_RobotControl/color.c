@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <math.h>
 #include "color.h"
 
 int classify_color_hsv_from_values(int R, int G, int B, int A, bool color)
@@ -12,7 +13,7 @@ int classify_color_hsv_from_values(int R, int G, int B, int A, bool color)
     double S_MIN   = 0.15;   // if saturation below this, hue unreliable
 
     if (color) { V_BLACK = 0.15; } // when using color mode, black can be darker
-    else        {V_BLACK = 0.18; } // when using ambient mode, black is lighter due to ambient light
+    else        {V_BLACK = 0.25; } // when using ambient mode, black is lighter due to ambient light
 
     double H,S,V;
     rgba_to_hsv(R, G, B, A, &H, &S, &V);   // <-- use your function
