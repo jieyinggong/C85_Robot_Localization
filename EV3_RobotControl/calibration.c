@@ -31,6 +31,10 @@ typedef struct {
 
 void color_calibration()
 {
+    // possible changes:
+    // use gaussian for color hue instead of just black and white
+    // instead of using gaussian, get rid of outliers storing all the values, sorting, then stripping the higher and lower 5% of values
+
     // open file for writing 
     FILE *fp = fopen("color_calibration.txt", "w");
     if (fp == NULL) {
@@ -135,10 +139,12 @@ void adjust_black_white_thresholds(HSVRange *ranges) {
     // readjust black and white V thresholds based on gaussian assumption
     // and we compute standard deviation from V_min/V_max as an approximation
 
+    // possible changes: adjust sigma and confidence level
+
     for (int i = 0; i <= 1; i++) { // 0 = black, 1 = white
         double mean = ranges[i].V_avg;
 
-        // approximate standard deviation from min/max (assuming ~4 sigma range)
+        // approximate standard deviation from min/max (assuming ~4 sigma range) -- adjustable
         double sigma = (ranges[i].V_max - ranges[i].V_min) / 4.0;
 
         // 95% confidence threshold (~2 sigma) -- can adjust from 2.0 to other value to control tightness of black and white bound
@@ -171,6 +177,7 @@ void print_get_color_calibration(int i)
 // If chroma ~ 0 (gray), H is set to -1.0.
 void rgba_to_hsv(int R, int G, int B, int A, double *H, double *S, double *V)
 {
+    // recheck this to make sure its correct
     // 1) Ambient correction + clamp to [0,1] using auto scale
     double Rc = (double)R + (double)A;
     double Gc = (double)G + (double)A;
@@ -247,7 +254,7 @@ int classify_color_hsv(int R, int G, int B, int A)
     // not black or white, check other colors
     for (int i = 2; i < COLOR_COUNT; i++) {
         if (H >= ranges[i].H_min && H <= ranges[i].H_max &&
-            S >= ranges[i].S_min && S <= ranges[i].S_max) {
+            S >= ranges[i].S_min && S <= ranges[i].S_max) { // hue matters more than saturation in color detection so you could take it out ig
             return i; // return color index
         }
     }
@@ -260,6 +267,10 @@ int classify_color_hsv(int R, int G, int B, int A)
 ////////////////////////////////////////
 
 void color_probability(){
+    // possible changes: 
+    // increase sample count per color. Even when writing the real code, sample a color multiple times to determine color
+    // take more samples per scan (add another inner loop   )
+
     FILE *fp = fopen("color_probability.txt", "w");
     if (fp == NULL) {
         fprintf(stderr, "Failed to open file for color probability.\n");
