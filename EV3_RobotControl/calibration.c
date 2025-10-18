@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <unistd.h>
+#include "calibration.h"
 
 
 #define EPS 1e-6
@@ -21,8 +22,8 @@ typedef struct {
     double probability;
 } ColorProbability;
 
-HSVRange ranges[6]; // store the HSV ranges for each color
-ColorProbability color_probabilities[6]; // stores the color probabilities
+// HSVRange ranges[6]; // store the HSV ranges for each color
+// ColorProbability color_probabilities[6]; // stores the color probabilities
 
 ////////////////////////////////////////
 // Color calibration measurement 
