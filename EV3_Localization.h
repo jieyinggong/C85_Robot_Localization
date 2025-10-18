@@ -69,7 +69,7 @@ code that you have to complete in order to implement the localization algorithms
 #include "./EV3_RobotControl/btcomm.h"
 
 #ifndef HEXKEY
-	#define HEXKEY "00:16:53:56:55:D9"	// <--- SET UP YOUR EV3's HEX ID here
+	#define HEXKEY "00:16:53:55:D9:FC"	// <--- SET UP YOUR EV3's HEX ID here
 #endif
 
 int parse_map(unsigned char *map_img, int rx, int ry);
@@ -77,6 +77,7 @@ int robot_localization(int *robot_x, int *robot_y, int *direction);
 int go_to_target(int robot_x, int robot_y, int direction, int target_x, int target_y);
 int find_street(void);
 int drive_along_street(void);
+int detect_intersection(void);
 int scan_intersection(int *tl, int *tr, int *br, int *bl);
 int turn_at_intersection(int turn_direction);
 void calibrate_sensor(void);

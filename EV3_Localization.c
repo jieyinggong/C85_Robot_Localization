@@ -94,7 +94,7 @@ int map[400][4];            // This holds the representation of the map, up to 2
 int sx, sy;                 // Size of the map (number of intersections along x and y)
 double beliefs[400][4];     // Beliefs for each location and motion direction
 
-int get_color_from_rgb(int R, int G, int B) {
+int get_color_from_rgb(int R, int G, int B, int A) {
   // Thresholds for color detection
   const int RED_THRESHOLD = 200;
   const int GREEN_THRESHOLD = 200;
@@ -104,9 +104,9 @@ int get_color_from_rgb(int R, int G, int B) {
 
   int brightness = R + G + B;
 
-  if (brightness < BLACK_THRESHOLD) {
+  if (brightness < BLACK_THRESHOLD || A > 80) {
     return 4;  // Black
-  } else if (brightness > WHITE_THRESHOLD) {
+  } else if (brightness > WHITE_THRESHOLD || A < 10) {
     return 5;  // White
   } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
     return 0;  // Red
@@ -373,14 +373,7 @@ int main(int argc, char *argv[])
 
 int find_street(void)   
 {
- /*
-  * This function gets your robot onto a street, wherever it is placed on the map. You can do this in many ways, but think
-  * about what is the most effective and reliable way to detect a street and stop your robot once it's on it.
-  * 
-  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
-  * bot after calling this function
-  */   
-  return(0);
+  return 0;
 }
 
 int drive_along_street(void)
@@ -396,7 +389,47 @@ int drive_along_street(void)
   * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
   * bot after calling this function.
   */   
+
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+
+  // Test stopping with brake mode
+  // stop when detect intersection
+  if (detect_intersection()) {
+    fprintf(stderr, "Detected intersection, stopping...\n");
+    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+    sleep(1);
+    return 1; // Successfully reached an intersection
+  }
+
   return(0);
+}
+
+int detect_intersection(void)
+{
+ /*
+  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
+  * you like, but it should be reliable and robust.
+  * 
+  * The return value should be 1 if an intersection is detected, and 0 otherwise.
+  */   
+  // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = get_color_from_rgb(R, G, B, A);
+    if (color == 1) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
 }
 
 int scan_intersection(int *tl, int *tr, int *br, int *bl)

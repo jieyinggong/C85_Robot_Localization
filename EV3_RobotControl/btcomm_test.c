@@ -50,6 +50,44 @@ int main(int argc, char *argv[]) {
   tone_data[3][1] = 250;
   tone_data[3][2] = 63;
 
+  int TONE_GREEN[50][3] = {
+  {330,150,30},  // E4
+  {392,150,40},  // G4
+  {523,220,50},  // C5 (land)
+  {-1,-1,-1}     // terminator
+  };
+
+  int TONE_BLUE[50][3] = {
+  {523,130,30},  // C5
+  {392,130,30},  // G4
+  {330,200,30},  // E4
+  {-1,-1,-1}
+  };
+
+  int TONE_WHITE[50][3] = {
+  {523,90,18},   // C5
+  {523,90,18},   // C5 (repeat)
+  {523,90,18},   // C5 (repeat)
+  {-1,-1,-1}
+  };
+
+  int TONE_INTERSECTION[50][3] = {
+  {880,100,40},   // A5
+  {440,100,40},   // A4
+  {880,100,45},   // A5 again (echo)
+  {660,250,50},   // E5 (hold)
+  {-1,-1,-1}
+  };
+
+  int TONE_LOCALIZATION_DONE[50][3] = {
+  {392,180,45},   // G4
+  {523,180,50},   // C5
+  {659,180,55},   // E5
+  {784,220,60},   // G5 (octave)
+  {1047,400,63},  // C6 (bright finale)
+  {-1,-1,-1}
+  };
+
   memset(&reply[0], 0, 1024);
 
 // just uncomment your bot's hex key to compile for your bot, and comment the
@@ -83,21 +121,33 @@ int main(int argc, char *argv[]) {
   fprintf(stderr, "Testing stop with brake mode...\n");
   BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
   sleep(1);
+  // BT_play_tone_sequence(TONE_GREEN);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_BLUE);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_WHITE);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_INTERSECTION);
+  // sleep(1);
+  // BT_play_tone_sequence(TONE_LOCALIZATION_DONE);
 
-  // Test turning right
-  fprintf(stderr, "Testing turn right...\n");
-  BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn left by running motor A forward and motor B backward
-  sleep(2);
+  // test find_street function
+  recorrect_to_black();
+  
+  // if (find_street()) 
+  // {
+  //   fprintf(stderr, "Street found!\n");
+  // }
 
-  // Test turning left
-  fprintf(stderr, "Testing turn left...\n");
-  BT_turn(MOTOR_A, -50, MOTOR_C, 50);  // Turn right by running motor A backward and motor C forward
-  sleep(2);
+  // // Test driving forward
+  // fprintf(stderr, "Testing drive forward...\n");
+  // BT_drive(MOTOR_A, MOTOR_C, 12, 10);
+  // sleep(8);  // Drive for 4 seconds
 
-  // Test stopping without brake mode
-  fprintf(stderr, "Testing stop without brake mode...\n");
-  BT_motor_port_stop(MOTOR_A | MOTOR_C, 0);  // Stop motors A and B without active brake
-  sleep(1);
+  // // Test stopping with brake mode
+  // fprintf(stderr, "Testing stop with brake mode...\n");
+  // BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+  // sleep(1);
 
   // Test reading RGB color sensor
   fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
@@ -132,29 +182,72 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
   }
 
-  // Test reading gyro sensor and turning right 90 degrees
-  fprintf(stderr, "Testing gyro sensor for 90-degree turn...\n");
-  int angle = 0, rate = 0;
+  // // Test turning left
+  // fprintf(stderr, "Testing turn left...\n");
+  // BT_turn(MOTOR_A, -50, MOTOR_C, 50);  // Turn right by running motor A backward and motor C forward
+  // sleep(2);
 
-  // Reset gyro sensor to zero
-  if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
-    fprintf(stderr, "Failed to reset gyro sensor.\n");
-  } else {
-    // Start turning right
-    BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
+  // // Test stopping without brake mode
+  // fprintf(stderr, "Testing stop without brake mode...\n");
+  // BT_motor_port_stop(MOTOR_A | MOTOR_C, 0);  // Stop motors A and B without active brake
+  // sleep(1);
 
-    // Monitor the angle until it reaches 90 degrees
-    while (angle < 90) {
-      if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
-        fprintf(stderr, "Failed to read gyro sensor.\n");
-        break;
-      }
-      fprintf(stderr, "Current angle: %d\n", angle);
-    }
+  // // Test reading RGB color sensor
+  // fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
+  // int R, G, B, A;
+  // if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+  //   fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+  //   int color = get_color_from_rgb(R, G, B, A);
+  //   switch (color) {
+  //     case 0:
+  //       fprintf(stderr, "Detected color: Red\n");
+  //       break;
+  //     case 1:
+  //       fprintf(stderr, "Detected color: Yellow\n");
+  //       break;
+  //     case 2:
+  //       fprintf(stderr, "Detected color: Green\n");
+  //       break;
+  //     case 3:
+  //       fprintf(stderr, "Detected color: Blue\n");
+  //       break;
+  //     case 4:
+  //       fprintf(stderr, "Detected color: Black\n");
+  //       break;
+  //     case 5:
+  //       fprintf(stderr, "Detected color: White\n");
+  //       break;
+  //     default:
+  //       fprintf(stderr, "Detected color: Other\n");
+  //       break;
+  //   }
+  // } else {
+  //   fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+  // }
 
-    // Stop the motors
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
-  }
+  // // Test reading gyro sensor and turning right 90 degrees
+  // fprintf(stderr, "Testing gyro sensor for 90-degree turn...\n");
+  // int angle = 0, rate = 0;
+
+  // // Reset gyro sensor to zero
+  // if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
+  //   fprintf(stderr, "Failed to reset gyro sensor.\n");
+  // } else {
+  //   // Start turning right
+  //   BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
+
+  //   // Monitor the angle until it reaches 90 degrees
+  //   while (angle < 90) {
+  //     if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
+  //       fprintf(stderr, "Failed to read gyro sensor.\n");
+  //       break;
+  //     }
+  //     fprintf(stderr, "Current angle: %d\n", angle);
+  //   }
+
+  //   // Stop the motors
+  //   BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
+  // }
 
   // Test color calibration
   //  R,G,B,A;
