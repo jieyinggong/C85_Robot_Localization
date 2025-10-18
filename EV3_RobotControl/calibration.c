@@ -82,7 +82,7 @@ void color_calibration()
 
         ranges[i] = (HSVRange){H_min, H_max, H_avg, S_min, S_max, S_avg, V_min, V_max, V_avg};
 
-        // write to file
+        // print non adjusted values
         printf("Color %d max HSV = (%.2f, %.2f, %.2f)\n", i, H_max, S_max, V_max);
         printf("Color %d min HSV = (%.2f, %.2f, %.2f)\n", i, H_min, S_min, V_min);
         printf("Color %d average HSV = (%.2f, %.2f, %.2f)\n", i, H_avg, S_avg, V_avg);
@@ -113,7 +113,7 @@ void adjust_hue_overlaps(HSVRange *ranges) {
     // adjust hue overlaps for the colors (not black and white cuz we don't care about its hue)
     // if ranges overlap, set the boundary to the midpoint of the overlap minus/plus delta
 
-    const double delta = 0.5;   // can adjust
+    const double delta = 1.0;   // can adjust
     for (int i = 2; i < COLOR_COUNT - 1; i++) {
         for (int j = i + 1; j < COLOR_COUNT; j++) {
             if (ranges[i].H_max > ranges[j].H_min && ranges[i].H_min < ranges[j].H_max) {
@@ -140,7 +140,7 @@ void adjust_black_white_thresholds(HSVRange *ranges) {
         // approximate standard deviation from min/max (assuming ~4 sigma range)
         double sigma = (ranges[i].V_max - ranges[i].V_min) / 4.0;
 
-        // 95% confidence threshold (~2 sigma)
+        // 95% confidence threshold (~2 sigma) -- can adjust from 2.0 to other value to control tightness of black and white bound
         if (i == 0) { // black: max V threshold = mean + 2*sigma
             ranges[i].V_max = mean + 2.0 * sigma;
             if (ranges[i].V_max > 1.0) ranges[i].V_max = 1.0;
@@ -149,8 +149,8 @@ void adjust_black_white_thresholds(HSVRange *ranges) {
             if (ranges[i].V_min < 0.0) ranges[i].V_min = 0.0;
         }
 
-        printf("Adjusted %s V threshold: min=%.3f, max=%.3f\n",
-               (i==0) ? "BLACK" : "WHITE", ranges[i].V_min, ranges[i].V_max);
+        // printf("Adjusted %s V threshold: min=%.3f, max=%.3f\n",
+        //       (i==0) ? "BLACK" : "WHITE", ranges[i].V_min, ranges[i].V_max);
     }
 }
 
@@ -161,6 +161,7 @@ void print_get_color_calibration(int i)
     
     const char *names[] = {"BLACK", "WHITE", "RED", "YELLOW", "GREEN", "BLUE"};
     printf("Place %s under the sensor and press Enter...\n", names[i]);
+    flush_stdin();
     getchar();
 }
 
@@ -272,6 +273,7 @@ void color_probability(){
         for (int j = 0; j < COLOR_SAMPLE_COUNT; j++) {
             // press enter when you are ready to measure
             printf("Place %s under the sensor and press Enter to measure probability...\n", names[i]);
+            flush_stdin();
             getchar();
 
             int R, G, B, A;
