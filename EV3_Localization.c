@@ -519,75 +519,87 @@ int find_street(void)
   return 0;
 }
 
-// int drive_along_street(void)
-// {
-//  /*
-//   * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
-//   * the map. It stops at an intersection.
-//   * 
-//   * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
-//   * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
-//   * or the course instructor for help carrying out your plan.
-//   * 
-//   * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
-//   * bot after calling this function.
-//   */   
+int drive_along_street(void)
+{
+ /*
+  * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
+  * the map. It stops at an intersection.
+  * 
+  * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
+  * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
+  * or the course instructor for help carrying out your plan.
+  * 
+  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
+  * bot after calling this function.
+  */   
 
-//   return(0);
-// }
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  BT_drive(MOTOR_A, MOTOR_D, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
 
-// int detect_intersection(void)
-// {
-//  /*
-//   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
-//   * you like, but it should be reliable and robust.
-//   * 
-//   * The return value should be 1 if an intersection is detected, and 0 otherwise.
-//   */   
-//   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
-//   return(0);
-// }
-// 
-//   return(0);
-// }
+  // Test stopping with brake mode
+  // stop when detect intersection
+  if (detect_intersection()) {
+    fprintf(stderr, "Detected intersection, stopping...\n");
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
+    sleep(1);
+    return 1; // Successfully reached an intersection
+  }
 
-// int detect_intersection(void)
-// {
-//  /*
-//   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
-//   * you like, but it should be reliable and robust.
-//   * 
-//   * The return value should be 1 if an intersection is detected, and 0 otherwise.
-//   */   
-//   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
-//   return(0);
-// }
+  return(0);
+}
 
-// int scan_intersection(int *tl, int *tr, int *br, int *bl)
-// {
-//  /*
-//   * This function carries out the intersection scan - the bot should (obviously) be placed at an intersection for this,
-//   * and the specific set of actions will depend on how you designed your bot and its sensor. Whatever the process, you
-//   * should make sure the intersection scan is reliable - i.e. the positioning of the sensor is reliably over the buildings
-//   * it needs to read, repeatably, and as the robot moves over the map.
-//   * 
-//   * Use the APIs sensor reading calls to poll the sensors. You need to remember that sensor readings are noisy and 
-//   * unreliable so * YOU HAVE TO IMPLEMENT SOME KIND OF SENSOR / SIGNAL MANAGEMENT * to obtain reliable measurements.
-//   * 
-//   * Recall your lectures on sensor and noise management, and implement a strategy that makes sense. Document your process
-//   * in the code below so your TA can quickly understand how it works.
-//   * 
-//   * Once your bot has read the colours at the intersection, it must return them using the provided pointers to 4 integer
-//   * variables:
-//   * 
-//   * tl - top left building colour
-//   * tr - top right building colour
-//   * br - bottom right building colour
-//   * bl - bottom left building colour
-//   * 
-//   * The function's return value can be used to indicate success or failure, or to notify your code of the bot's state
-//   * after this call.
-//   */
+int detect_intersection(void)
+{
+ /*
+  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
+  * you like, but it should be reliable and robust.
+  * 
+  * The return value should be 1 if an intersection is detected, and 0 otherwise.
+  */   
+  // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = get_color_from_rgb(R, G, B, A);
+    if (color == 1) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
+}
+
+int scan_intersection(int *tl, int *tr, int *br, int *bl)
+{
+ /*
+  * This function carries out the intersection scan - the bot should (obviously) be placed at an intersection for this,
+  * and the specific set of actions will depend on how you designed your bot and its sensor. Whatever the process, you
+  * should make sure the intersection scan is reliable - i.e. the positioning of the sensor is reliably over the buildings
+  * it needs to read, repeatably, and as the robot moves over the map.
+  * 
+  * Use the APIs sensor reading calls to poll the sensors. You need to remember that sensor readings are noisy and 
+  * unreliable so * YOU HAVE TO IMPLEMENT SOME KIND OF SENSOR / SIGNAL MANAGEMENT * to obtain reliable measurements.
+  * 
+  * Recall your lectures on sensor and noise management, and implement a strategy that makes sense. Document your process
+  * in the code below so your TA can quickly understand how it works.
+  * 
+  * Once your bot has read the colours at the intersection, it must return them using the provided pointers to 4 integer
+  * variables:
+  * 
+  * tl - top left building colour
+  * tr - top right building colour
+  * br - bottom right building colour
+  * bl - bottom left building colour
+  * 
+  * The function's return value can be used to indicate success or failure, or to notify your code of the bot's state
+  * after this call.
+  */
  
 //   /************************************************************************************************************************
 //    *   TO DO  -   Complete this function
