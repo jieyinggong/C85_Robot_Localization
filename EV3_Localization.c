@@ -649,7 +649,10 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
    *   TO DO  -   Complete this function
    ***********************************************************************************************************************/
   // If not already on street, acquire it first
+  // *Minty - find street and drive along it to reach an intersection
   find_street();
+  drive_along_street();
+  // Minty*
 
   // Random seed for action selection
   srand((unsigned int)time(NULL));
@@ -660,9 +663,11 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
   while (1)
   {
     // 1) Sense: scan 4 corners and do sensor (measurement) update
+    // *Minty
     int tl,tr,br,bl;
     scan_intersection(&tl,&tr,&br,&bl);
     int z[4] = {tl,tr,br,bl};
+    // Minty*
 
     updateBelief(lastMoveDir, z);   // Bayesian sensor update with your internal likelihood model
     normalize_beliefs();
@@ -686,7 +691,9 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
     int n = build_feasible_directions(dirs);
     int moveDir = dirs[rand() % n];
 
+    // *Minty
     execute_move(moveDir);
+    // Minty*
 
     // 4) Motion update (deterministic straight-line model provided by your helper)
     actionModel(moveDir);
