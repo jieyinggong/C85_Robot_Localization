@@ -257,7 +257,7 @@ int BT_motor_port_start(char port_ids, char power)
  //  a single command by ORing their respective hex values, e.g.
  //
  // BT_motor_port_power(MOTOR_A, 100);   	<-- set motor at port A to 100% power
- // BT_motor_port_power(MOTOR_A|MOTOR_C, 50);   <-- set motors at port A and port C to 50% power
+ // BT_motor_port_power(MOTOR_A|MOTOR_D, 50);   <-- set motors at port A and port C to 50% power
  //
  // Power must be in [-100, 100] - Forward and reverse
  // 

@@ -21,8 +21,6 @@
 
 #include "btcomm.h"
 
-int get_color_from_rgb(int R, int G, int B, int A);
-
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
   char reply[1024];
@@ -60,7 +58,12 @@ int main(int argc, char *argv[]) {
 
   // name must not contain spaces or special characters
   // max name length is 12 characters
-  BT_setEV3name("R2D2");
+  //BT_setEV3name("R2D2");
+
+  // Calibration of color sensor
+  // color_calibration();
+
+  read_color_calibration();
 
   BT_play_tone_sequence(tone_data);
 
@@ -94,30 +97,6 @@ int main(int argc, char *argv[]) {
   int R, G, B, A;
   if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = get_color_from_rgb(R, G, B, A);
-    switch (color) {
-      case 0:
-        fprintf(stderr, "Detected color: Red\n");
-        break;
-      case 1:
-        fprintf(stderr, "Detected color: Yellow\n");
-        break;
-      case 2:
-        fprintf(stderr, "Detected color: Green\n");
-        break;
-      case 3:
-        fprintf(stderr, "Detected color: Blue\n");
-        break;
-      case 4:
-        fprintf(stderr, "Detected color: Black\n");
-        break;
-      case 5:
-        fprintf(stderr, "Detected color: White\n");
-        break;
-      default:
-        fprintf(stderr, "Detected color: Other\n");
-        break;
-    }
   } else {
     fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
   }
@@ -139,40 +118,13 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to read gyro sensor.\n");
         break;
       }
-      fprintf(stderr, "Current angle: %d\n", angle);
+    //  fprintf(stderr, "Current angle: %d\n", angle);
     }
 
     // Stop the motors
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
   }
 
   BT_close();
   fprintf(stderr, "Done!\n");
-}
-
-int get_color_from_rgb(int R, int G, int B, int A) {
-  // Thresholds for color detection
-  const int RED_THRESHOLD = 200;
-  const int GREEN_THRESHOLD = 200;
-  const int BLUE_THRESHOLD = 200;
-  const int BLACK_THRESHOLD = 50;
-  const int WHITE_THRESHOLD = 600;
-
-  int brightness = R + G + B;
-
-  if (brightness < BLACK_THRESHOLD || A > 80) {
-    return 4;  // Black
-  } else if (brightness > WHITE_THRESHOLD || A < 10) {
-    return 5;  // White
-  } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 0;  // Red
-  } else if (R > RED_THRESHOLD && G > GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 1;  // Yellow
-  } else if (G > GREEN_THRESHOLD && R < RED_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 2;  // Green
-  } else if (B > BLUE_THRESHOLD && R < RED_THRESHOLD && G < GREEN_THRESHOLD) {
-    return 3;  // Blue
-  } else {
-    return 6;  // Other
-  }
 }

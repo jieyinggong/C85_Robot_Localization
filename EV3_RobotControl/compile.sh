@@ -1,1 +1,1 @@
-g++ btcomm_test.c btcomm.c -lbluetooth
+g++ btcomm_test.c btcomm.c street.c intersection.c color.c -lbluetooth
