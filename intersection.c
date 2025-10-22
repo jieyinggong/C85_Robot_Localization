@@ -9,7 +9,7 @@
 #define WINDOW     5.0     
 #define N_SAMPLES  24   
 
-int detect_intersectionc(void)
+int detect_intersection(void)
 {
  /*
   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
@@ -18,10 +18,10 @@ int detect_intersectionc(void)
   * The return value should be 1 if an intersection is detected, and 0 otherwise.
   */   
   int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(C_YELLOW, &R, &G, &B, &A) == 1) {
+  if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
     int color = classify_color_hsv(R, G, B, A);
-    if (color == 3) { // Yellow
+    if (color == C_BLACK) { // Yellow
       fprintf(stderr, "Detected intersection (Yellow)\n");
       return 1;
     } else {

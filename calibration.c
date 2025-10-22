@@ -254,9 +254,19 @@ int classify_color_hsv(int R, int G, int B, int A)
         return 1; // white
     }
     // not black or white, check other colors
-    for (int i = 2; i < COLOR_COUNT; i++) {
-        if (H >= ranges[i].H_min && H <= ranges[i].H_max &&
-            S >= ranges[i].S_min && S <= ranges[i].S_max) { // hue matters more than saturation in color detection so you could take it out ig
+    // printf("H: %.2f, S: %.2f, V: %.2f, V_min: %.2f, V_max: %.2f\n", H, S, V, ranges[2].V_min, ranges[2].V_max);
+    if (ranges[2].H_min <= ranges[2].H_max) {
+        // Normal (non-wrapping) range
+        if (H >= ranges[2].H_min && H <= ranges[2].H_max)
+            return 2;
+    } else {
+        // Wrapping range (e.g. 300 to 60)
+        if (H >= ranges[2].H_min || H <= ranges[2].H_max)
+            return 2;
+    }
+
+    for (int i = 3; i < COLOR_COUNT; i++) {
+        if (H >= ranges[i].H_min && H <= ranges[i].H_max) { // hue matters more than saturation in color detection so you could take it out ig
             return i; // return color index
         }
     }

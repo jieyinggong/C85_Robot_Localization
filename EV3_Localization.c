@@ -96,6 +96,7 @@
 #include <string.h>
 #include "EV3_RobotControl/btcomm.h"
 #include "const.h"
+#include "intersection.h"
 
 // #define DIR_UP    0
 // #define DIR_RIGHT 1
@@ -392,6 +393,15 @@ int main(int argc, char *argv[])
  dest_x=atoi(argv[2]);
  dest_y=atoi(argv[3]);
 
+  // Open a socket to the EV3 for remote controlling the bot.
+ if (BT_open(HEXKEY)!=0)
+ {
+  fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
+  fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
+  free(map_image);
+  exit(1);
+ }
+
  if (dest_x==-1&&dest_y==-1)
  {
   calibrate_sensor();
@@ -438,15 +448,6 @@ int main(int argc, char *argv[])
    beliefs[i+(j*sx)][3]=1.0/(double)(sx*sy*4);
   }
 
- // Open a socket to the EV3 for remote controlling the bot.
- if (BT_open(HEXKEY)!=0)
- {
-  fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
-  fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
-  free(map_image);
-  exit(1);
- }
-
  fprintf(stderr,"All set, ready to go!\n");
  
 /*******************************************************************************************************************************
@@ -487,6 +488,18 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
+ int tl, tr, br, bl;
+ if (detect_intersection() == 0) {
+   fprintf(stderr, "Not at an intersection to start with, exiting...\n");
+   free(map_image);
+   BT_close();
+   exit(0);
+ }
+
+  free(map_image);
+  BT_close();
+ exit(0); 
+ 
  int robot_x = -1;
  int robot_y = -1;
  int direction = 0;
@@ -836,11 +849,12 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
-  color_calibration();
-  
-  printf("Calibration complete, now measuring colour probabilities...\n");
-  getchar();
+  // color_calibration();
+  // 
+  // printf("Calibration complete, now measuring colour probabilities...\n");
+  // getchar();
 
+  read_color_calibration(ranges);
   color_probability(); 
   return;
 }

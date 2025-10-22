@@ -1,0 +1,6 @@
+Color 0 probability: 1.00
+Color 1 probability: 1.00
+Color 2 probability: 1.00
+Color 3 probability: 1.00
+Color 4 probability: 1.00
+Color 5 probability: 1.00
