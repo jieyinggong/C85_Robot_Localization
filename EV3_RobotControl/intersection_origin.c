@@ -745,8 +745,4 @@ int back_to_intersection(){
   } else {
     fprintf(stderr, "Already on an intersection.\n");
   }
-<<<<<<< HEAD
-=======
-  return 1;
->>>>>>> 8a6f38e (update  it with clibration and move intersection part)
 }
