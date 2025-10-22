@@ -118,6 +118,7 @@
 #define MIN_SCANS_TO_CONFIRM 3
 #define CERTAINTY_THRESHOLD  0.80
 #define MASS_EPS             1e-9
+#define FLOOR_EPS            1e-3
 #define NAV_CERTAINTY_THRESHOLD  0.65   // 导航阶段的“仍然定位”阈值，可以稍低于定位完成阈值
 #define NAV_SCAN_EVERY_STEPS     1      // 每经过几个路口做一次扫描；设为1表示每个路口都扫描
 
@@ -321,67 +322,53 @@ void updateBelief(int moveDir, int readings[4])
   normalize_beliefs();
 }
 
-// ==============================================================================================
-//                                运动更新：actionModel（直线、确定性）
-// ==============================================================================================
-//
-// 参数：
-//   moveDir - 本次选择的绝对移动方向（0=UP,1=RIGHT,2=DOWN,3=LEFT）
-//
-// 逻辑：
-//   构造 newBeliefs = 0
-//   对每个 idx、任意朝向 d 的质量 mass = beliefs[idx][d]：
-//     - 计算沿 moveDir 的相邻路口 j（越界则无法转移，丢弃这部分质量）
-//     - 将 mass 加到 newBeliefs[j][moveDir] （新朝向设为 moveDir）
-//   最后：newBeliefs 归一化 → 覆盖 beliefs
-//
 void actionModel(int moveDir)
 {
   static double newBeliefs[400][4];
-  // 清零
-  for(int i=0;i<sx*sy;i++)
-    for(int d=0; d<4; d++)
-      newBeliefs[i][d] = 0.0;
+  static unsigned char hasIncoming[400][4];
 
-  for(int idx=0; idx < sx*sy; idx++){
+  // 清零累加数组与“是否有来源进入”的标记
+  memset(newBeliefs, 0, sizeof(newBeliefs));
+  memset(hasIncoming, 0, sizeof(hasIncoming));
+
+  // 把每个状态沿 moveDir 平移一格；越界的来源直接丢弃（不加回）
+  for (int idx = 0; idx < sx * sy; idx++) {
     int x = idx_to_x(idx);
     int y = idx_to_y(idx);
 
-    // 计算目的地（相邻路口）
-    int nx = x, ny = y;
-    if      (moveDir == DIR_UP)    ny = y - 1;
-    else if (moveDir == DIR_RIGHT) nx = x + 1;
-    else if (moveDir == DIR_DOWN)  ny = y + 1;
-    else if (moveDir == DIR_LEFT)  nx = x - 1;
+    for (int dir = 0; dir < 4; dir++) {
+      double mass = beliefs[idx][dir];
+      if (mass <= 0.0) continue; // 无质量，跳过
 
-    // 越界则无法转移 —— 这部分质量被抛弃（后续会归一化）
-    if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) {
-      continue;
-    }
+      int nx = x, ny = y;
+      if      (moveDir == DIR_UP)    ny--;
+      else if (moveDir == DIR_RIGHT) nx++;
+      else if (moveDir == DIR_DOWN)  ny++;
+      else if (moveDir == DIR_LEFT)  nx--;
 
-    int j = xy_to_idx(nx, ny);
+      // invalid
+      if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) {
+        continue;
+      }
 
-    // 汇聚所有旧朝向的质量到“新格子 + 新朝向=moveDir”
-    double sumMass = beliefs[idx][0] + beliefs[idx][1] + beliefs[idx][2] + beliefs[idx][3];
-    if (sumMass > 0.0){
-      newBeliefs[j][moveDir] += sumMass;
+      int j = xy_to_idx(nx, ny);
+      newBeliefs[j][dir] += mass;         // 方向不变，只平移位置
+      hasIncoming[j][dir] = 1;            // 标记：这个状态有来源质量进入
     }
   }
 
-  // 将 newBeliefs 覆盖回 beliefs，并归一化
-  double total = 0.0;
-  for(int i=0;i<sx*sy;i++)
-    for(int d=0; d<4; d++){
-      beliefs[i][d] = newBeliefs[i][d];
-      total += beliefs[i][d];
+  // 给所有“没有任何来源进入”的状态加一个极小地板值
+  for (int j = 0; j < sx * sy; j++) {
+    for (int d = 0; d < 4; d++) {
+      if (!hasIncoming[j][d]) {
+        newBeliefs[j][d] += FLOOR_EPS;
+      }
     }
-
-  if (total > MASS_EPS){
-    double inv = 1.0 / total;
-    for(int i=0;i<sx*sy;i++)
-      for(int d=0; d<4; d++)
-        beliefs[i][d] *= inv;
   }
+
+  // 覆盖并归一化
+  memcpy(beliefs, newBeliefs, sizeof(newBeliefs));
+  normalize_beliefs();
 }
 
 int main(int argc, char *argv[])
@@ -691,7 +678,6 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
     // Minty*
 
     updateBelief(lastMoveDir, z);   // Bayesian sensor update with your internal likelihood model
-    normalize_beliefs();
     scans++;
 
     // 2) Check convergence
@@ -718,7 +704,6 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
 
     // 4) Motion update (deterministic straight-line model provided by your helper)
     actionModel(moveDir);
-    normalize_beliefs();
 
     lastMoveDir = moveDir;
   }
@@ -740,7 +725,6 @@ static int perform_step_and_check(int moveDir, int *pCurX, int *pCurY, int *pCur
 
   // Motion (mathematical) update
   actionModel(moveDir);
-  normalize_beliefs();
 
   (*pStepCounter)++;
 
@@ -750,13 +734,11 @@ static int perform_step_and_check(int moveDir, int *pCurX, int *pCurY, int *pCur
     if (scan_intersection(&tl,&tr,&br,&bl)){
       int z[4] = {tl,tr,br,bl};
       updateBelief(moveDir, z);
-      normalize_beliefs();
     } else {
       // If scan failed, be conservative but continue; still check localization
       int dummy_tl=-1,dummy_tr=-1,dummy_br=-1,dummy_bl=-1;
       int z[4] = {dummy_tl,dummy_tr,dummy_br,dummy_bl};
       updateBelief(moveDir, z);
-      normalize_beliefs();
     }
 
     if (!localization_still_ok()){
@@ -825,7 +807,6 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
     int tl,tr,br,bl; scan_intersection(&tl,&tr,&br,&bl);
     int z[4] = {tl,tr,br,bl};
     updateBelief(cur_dir, z);
-    normalize_beliefs();
     if (!localization_still_ok()){
       return 0; // 目标附近定位不稳，也让 main 走重定位流程
     }
