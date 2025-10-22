@@ -247,7 +247,7 @@ int detect_intersection(void)
   }
 }
 
-int detect_intersection_or_street(void){
+int detect_intersection_or_street1(void){
   int R, G, B, A;
   if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
