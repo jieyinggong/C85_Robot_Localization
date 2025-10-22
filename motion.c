@@ -1,5 +1,5 @@
 #include "./EV3_RobotControl/btcomm.h"
-#include "intersection.h"
+#include "motion.h"
 #include <unistd.h>  // Required for usleep
 #include <stdbool.h>
 #include <math.h>   // Required for fmod
@@ -9,7 +9,7 @@
 #define WINDOW     5.0     
 #define N_SAMPLES  24   
 
-int detect_intersectionc(void)
+int detect_intersection(void)
 {
  /*
   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
@@ -18,19 +18,24 @@ int detect_intersectionc(void)
   * The return value should be 1 if an intersection is detected, and 0 otherwise.
   */   
   int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(C_YELLOW, &R, &G, &B, &A) == 1) {
-    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = classify_color_hsv(R, G, B, A);
-    if (color == 3) { // Yellow
+  int color = 6;
+  if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+   // fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    color = classify_color_hsv(R, G, B, A);
+    if (color == C_YELLOW) { // Yellow
       fprintf(stderr, "Detected intersection (Yellow)\n");
       return 1;
-    } else {
-      fprintf(stderr, "Not an intersection\n");
+    } else if (color == C_BLACK) {
+     // fprintf(stderr, "Detected street (Black), not an intersection\n");
       return 0;
+    } else {
+    // the case for not on the street nor intersection
+     // fprintf(stderr, "Not an intersection\n");
+      return 2;
     }
   } else {
     fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-    return 0;
+    return -1;
   }
 }
 
@@ -562,4 +567,46 @@ int back_to_intersection(){
     fprintf(stderr, "Already on an intersection.\n");
   }
   return 1;
+}
+
+int drive_along_street(void)
+{
+ /*
+  * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
+  * the map. It stops at an intersection.
+  * 
+  * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
+  * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
+  * or the course instructor for help carrying out your plan.
+  * 
+  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
+  * bot after calling this function.
+  */   
+
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  //BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+
+  // Test stopping with brake mode
+  // stop when detect intersection
+  int detected = detect_intersection();
+  int start_flag = 0;
+  while (detected == 0) {
+    if (start_flag == 0){
+        fprintf(stderr, "Driving along the street...\n");
+        start_flag = 1;
+          BT_drive(LEFT_MOTOR, RIGHT_MOTOR, 6, 5);
+    }
+    detected = detect_intersection();
+  }
+  BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
+  if (detected == 1){
+      fprintf(stderr, "Intersection detected during drive.\n");
+  }
+  if (detected == 2){
+      fprintf(stderr, "Not on street nor intersection during drive.\n");
+  }
+  sleep(1);
+  return 1;
+  //return(0);
 }
