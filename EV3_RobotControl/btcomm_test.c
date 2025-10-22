@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
   // initial color scan --> just make it work
      int R, G, B, A;
   for (int i = 0; i < 3; i++) {
-    if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) == 1) {
+    if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
       fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d) and color index = %d\n", i, R, G, B, A, R + A, G + A, B + A, classify_color_hsv_from_values(R, G, B, A, false));
     }
   }
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
   int angle = 0, rate = 0;
 
   // 1. starting sound
-  BT_play_tone_sequence(tone_data);
+  //BT_play_tone_sequence(tone_data);
   sleep(1);
 
   // 2. find street (assume robot is on random place on map)
@@ -155,46 +155,46 @@ int main(int argc, char *argv[]) {
   success = drive_along_street();
   if (success) {
     fprintf(stderr, "Reached intersection!\n");
-    BT_play_tone_sequence(TONE_INTERSECTION);
+   // BT_play_tone_sequence(TONE_INTERSECTION);
     sleep(1);
   }else {
     fprintf(stderr, "Failed to reach intersection.\n");
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);
-    BT_play_tone_sequence(TONE_FAILURE);
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);
+   // BT_play_tone_sequence(TONE_FAILURE);
     sleep(20);
   }
 
   // 4. scan intersection
   int tl, tr, br, bl;
   success = scan_intersection(&tl, &tr, &br, &bl);
-  if (success) {
-    fprintf(stderr, "Scan complete! Colours: TL=%d, TR=%d, BR=%d, BL=%d\n", tl, tr, br, bl);
-    // play tones in sequence for tl, tr, br, bl
-    // play tone for tl
-    if (tl == 2) BT_play_tone_sequence(TONE_GREEN);
-    else if (tl == 3) BT_play_tone_sequence(TONE_BLUE);
-    else if (tl == 5) BT_play_tone_sequence(TONE_WHITE);
-    else BT_play_tone_sequence(tone_data);
-    sleep(1);
-    // play tone for tr
-    if (tr == 2) BT_play_tone_sequence(TONE_GREEN);
-    else if (tr == 3) BT_play_tone_sequence(TONE_BLUE);
-    else if (tr == 5) BT_play_tone_sequence(TONE_WHITE);
-    else BT_play_tone_sequence(tone_data);
-    sleep(1);
-    // play tone for br
-    if (br == 2) BT_play_tone_sequence(TONE_GREEN);
-    else if (br == 3) BT_play_tone_sequence(TONE_BLUE); 
-    else if (br == 5) BT_play_tone_sequence(TONE_WHITE);
-    else BT_play_tone_sequence(tone_data);
-    sleep(1);
-    // play tone for bl
-    if (bl == 2) BT_play_tone_sequence(TONE_GREEN);
-    else if (bl == 3) BT_play_tone_sequence(TONE_BLUE);
-    else if (bl == 5) BT_play_tone_sequence(TONE_WHITE);
-    else BT_play_tone_sequence(tone_data);
-    sleep(1);
-  }
+  // if (success) {
+  //   fprintf(stderr, "Scan complete! Colours: TL=%d, TR=%d, BR=%d, BL=%d\n", tl, tr, br, bl);
+  //   // play tones in sequence for tl, tr, br, bl
+  //   // play tone for tl
+  //   if (tl == 2) BT_play_tone_sequence(TONE_GREEN);
+  //   else if (tl == 3) BT_play_tone_sequence(TONE_BLUE);
+  //   else if (tl == 5) BT_play_tone_sequence(TONE_WHITE);
+  //   else BT_play_tone_sequence(tone_data);
+  //   sleep(1);
+  //   // play tone for tr
+  //   if (tr == 2) BT_play_tone_sequence(TONE_GREEN);
+  //   else if (tr == 3) BT_play_tone_sequence(TONE_BLUE);
+  //   else if (tr == 5) BT_play_tone_sequence(TONE_WHITE);
+  //   else BT_play_tone_sequence(tone_data);
+  //   sleep(1);
+  //   // play tone for br
+  //   if (br == 2) BT_play_tone_sequence(TONE_GREEN);
+  //   else if (br == 3) BT_play_tone_sequence(TONE_BLUE); 
+  //   else if (br == 5) BT_play_tone_sequence(TONE_WHITE);
+  //   else BT_play_tone_sequence(tone_data);
+  //   sleep(1);
+  //   // play tone for bl
+  //   if (bl == 2) BT_play_tone_sequence(TONE_GREEN);
+  //   else if (bl == 3) BT_play_tone_sequence(TONE_BLUE);
+  //   else if (bl == 5) BT_play_tone_sequence(TONE_WHITE);
+  //   else BT_play_tone_sequence(tone_data);
+  //   sleep(1);
+  // }
 
   // Check if the bot is on an intersection
   if (!detect_intersection_or_street()) {
@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
     double time = 800+adjustment_attempts*100; // increase time for each attempt
       // back
       BT_timed_motor_port_start(MOTOR_A, -7, 80, time, 80);
-      BT_timed_motor_port_start(MOTOR_C, -6, 100, time, 100);
+      BT_timed_motor_port_start(MOTOR_D, -6, 100, time, 100);
       sleep(2);
 
       if (detect_intersection_or_street()) {
@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
       }
       // forward
       BT_timed_motor_port_start(MOTOR_A, 7, 80, time, 80);
-      BT_timed_motor_port_start(MOTOR_C, 6, 100, time, 100);
+      BT_timed_motor_port_start(MOTOR_D, 6, 100, time, 100);
       sleep(2);
       if (detect_intersection_or_street()) {
         fprintf(stderr, "Intersection or street found after forward adjustment.\n");
@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Failed to reset gyro sensor.\n");
   } else {
     // Start turning right
-    BT_turn(MOTOR_A, 12, MOTOR_C, -10);  // Turn right
+    BT_turn(MOTOR_A, 12, MOTOR_D, -10);  // Turn right
 
     // Monitor the angle until it reaches 90 degrees
     while (angle < 90) {
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Stop the motors
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
   }
   sleep(1);
   // 6. keep going... (drive along street until next intersection)
@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Failed to reset gyro sensor.\n");
   } else {
     // Start turning right
-    BT_turn(MOTOR_A, -12, MOTOR_C, 10);  // Turn right
+    BT_turn(MOTOR_A, -12, MOTOR_D, 10);  // Turn right
 
     // Monitor the angle until it reaches 90 degrees
     while (angle > -90.5) {
@@ -281,7 +281,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Stop the motors
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
   }
 
   // 7. done

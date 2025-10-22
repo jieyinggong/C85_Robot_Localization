@@ -6,9 +6,9 @@
 #include <math.h>   // Required for fmod
 
 #define PORT_GYRO  PORT_2
-#define PORT_COLOR PORT_3
+#define PORT_COLOR PORT_1
 #define MOTOR_LEFT  MOTOR_A
-#define MOTOR_RIGHT MOTOR_C
+#define MOTOR_RIGHT MOTOR_D
 
 #define DEG_STEP   15.0      
 #define WINDOW     5.0     
@@ -52,8 +52,8 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
     sleep(1); // Wait a moment for the gyro to stabilize
     // drive forwarde to the start point of scan
     BT_timed_motor_port_start(MOTOR_A, 7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(MOTOR_C, 6, 120, 1380, 100); // Start motor C with power 6, ramp up time 500ms
-   // BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+    BT_timed_motor_port_start(MOTOR_D, 6, 120, 1380, 100); // Start motor C with power 6, ramp up time 500ms
+   // BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
     fprintf(stderr, "Drive forward to start point of scan.\n");
     sleep(3); // Wait for the bot to reach the start point
     // ADD A ANGLE CHECK HERE TO ENSURE IT IS STRAIGHT
@@ -418,7 +418,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
             }
 
         BT_timed_motor_port_start(MOTOR_A, -7, 80, 1400, 100); 
-        BT_timed_motor_port_start(MOTOR_C, -6, 100, 1380, 100);
+        BT_timed_motor_port_start(MOTOR_D, -6, 100, 1380, 100);
 
         sleep(2); // Wait for the bot to return to original position
         fprintf(stderr, "Scan complete.\n");

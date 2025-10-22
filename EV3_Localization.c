@@ -265,13 +265,13 @@ int drive_along_street(void)
 
   // Test driving forward
   fprintf(stderr, "Testing drive forward...\n");
-  BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+  BT_drive(MOTOR_A, MOTOR_D, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
 
   // Test stopping with brake mode
   // stop when detect intersection
   if (detect_intersection()) {
     fprintf(stderr, "Detected intersection, stopping...\n");
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
     sleep(1);
     return 1; // Successfully reached an intersection
   }
