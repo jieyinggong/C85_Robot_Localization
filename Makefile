@@ -1,6 +1,6 @@
 # Compiler and flags
 CC = g++
-CFLAGS = -Wall -Wextra -O2 -I"EV3_RobotControl"
+CFLAGS = -w -O2 -I"EV3_RobotControl"
 
 # Target name
 TARGET = ev3_robot
