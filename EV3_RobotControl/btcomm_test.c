@@ -23,7 +23,6 @@
 #include "street.h"
 #include "color.h"
 #include "intersection.h"
-#include "calibration.h"
 
 void color_calibration();
 int classify_color_euclidean(int R, int G, int B, int A);

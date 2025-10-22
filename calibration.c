@@ -10,9 +10,6 @@
 // Color calibration measurement 
 ////////////////////////////////////////
 
-HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
-ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
-
 void color_calibration()
 {
     // possible changes:
@@ -331,40 +328,40 @@ void read_color_probability(ColorProbability *color_probabilities)
     fclose(fp);
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        printf("Usage: %s [0] [1]\n", argv[0]);
-        return 1;
-    }
-
-    // connect to robot 
-    char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
-    char reply[1024];
-
-    memset(&reply[0], 0, 1024);
-
-    #ifndef HEXKEY
-    #define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
-    #endif
-
-    BT_open(HEXKEY);
-
-    // name must not contain spaces or special characters
-    // max name length is 12 characters
-    BT_setEV3name("R2D2");
-
-    for (int i = 1; i < argc; i++) {
-        int arg = atoi(argv[i]);
-
-        if (arg == 0) {
-            color_calibration();
-        } else if (arg == 1) {
-            read_color_calibration(ranges);
-            color_probability();
-        } else {
-            printf("Unknown argument: %s\n", argv[i]);
-        }
-    }
-    BT_close();
-    return 0;
-}
+// int main(int argc, char *argv[]) {
+//     if (argc < 2) {
+//         printf("Usage: %s [0] [1]\n", argv[0]);
+//         return 1;
+//     }
+// 
+//     // connect to robot 
+//     // char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
+//     char reply[1024];
+// 
+//     memset(&reply[0], 0, 1024);
+// 
+//     #ifndef HEXKEY
+//     #define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
+//     #endif
+// 
+//     BT_open(HEXKEY);
+// 
+//     // name must not contain spaces or special characters
+//     // max name length is 12 characters
+//     BT_setEV3name("R2D2");
+// 
+//     for (int i = 1; i < argc; i++) {
+//         int arg = atoi(argv[i]);
+// 
+//         if (arg == 0) {
+//             color_calibration();
+//         } else if (arg == 1) {
+//             read_color_calibration(ranges);
+//             color_probability();
+//         } else {
+//             printf("Unknown argument: %s\n", argv[i]);
+//         }
+//     }
+//     BT_close();
+//     return 0;
+// }

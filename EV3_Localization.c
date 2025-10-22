@@ -94,6 +94,7 @@
 // Added headers to avoid implicit declaration warnings for standard functions
 #include <stdio.h>
 #include <string.h>
+#include "EV3_RobotControl/btcomm.h"
 
 #define DIR_UP    0
 #define DIR_RIGHT 1
@@ -127,8 +128,11 @@ int map[400][4];            // This holds the representation of the map, up to 2
 int sx, sy;                 // Size of the map (number of intersections along x and y)
 double beliefs[400][4];     // Beliefs for each location and motion direction
 
-ColorProbability color_probabilities[COLOR_COUNT];  // holds color probabilities read from file
-HSVRange ranges[COLOR_COUNT]; // holds color calibration read from file
+HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
+ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
+
+// ColorProbability color_probabilities[COLOR_COUNT];  // holds color probabilities read from file
+// HSVRange ranges[COLOR_COUNT]; // holds color calibration read from file
 
 // ---- Local tiny helpers in this translation unit ----
 static inline int idx_to_x(int idx){ return idx % sx; }

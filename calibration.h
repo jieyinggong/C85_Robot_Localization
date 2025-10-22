@@ -34,6 +34,8 @@ typedef struct {
 // Global variables
 ////////////////////////////////////////
 
+extern HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
+extern ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
 
 ////////////////////////////////////////
 // Color calibration
