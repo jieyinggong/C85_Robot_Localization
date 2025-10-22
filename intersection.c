@@ -9,7 +9,7 @@
 #define WINDOW     5.0     
 #define N_SAMPLES  24   
 
-int detect_intersection(void)
+int detect_intersectionc(void)
 {
  /*
   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
@@ -18,10 +18,10 @@ int detect_intersection(void)
   * The return value should be 1 if an intersection is detected, and 0 otherwise.
   */   
   int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+  if (BT_read_colour_RGBraw_NXT(C_YELLOW, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
     int color = classify_color_hsv(R, G, B, A);
-    if (color == C_BLACK) { // Yellow
+    if (color == 3) { // Yellow
       fprintf(stderr, "Detected intersection (Yellow)\n");
       return 1;
     } else {
@@ -39,24 +39,6 @@ int detect_intersection_or_street(void){
   if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
     int color = classify_color_hsv(R, G, B, A);
-    if (color == 1 || color == 5) { // Yellow
-      fprintf(stderr, "Detected intersection (Yellow) or Street (Black)\n");
-      return 1;
-    } else {
-      fprintf(stderr, "Not an intersection or street\n");
-      return 0;
-    }
-  } else {
-    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-    return 0;
-  }
-}
-
-int detect_intersection_or_street(void){
-  int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
-    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = classify_color_hsv_from_values(R, G, B, A, false);
     if (color == 1 || color == 5) { // Yellow
       fprintf(stderr, "Detected intersection (Yellow) or Street (Black)\n");
       return 1;

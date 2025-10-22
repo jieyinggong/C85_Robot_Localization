@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #include "btcomm.h"
 #include "intersection.h"
 #include "color.h"
@@ -13,6 +14,61 @@
 #define DEG_STEP   15.0      
 #define WINDOW     5.0     
 #define N_SAMPLES  24     
+=======
+#include "./EV3_RobotControl/btcomm.h"
+#include "intersection.h"
+#include <unistd.h>  // Required for usleep
+#include <stdbool.h>
+#include <math.h>   // Required for fmod
+#include "const.h"
+
+#define DEG_STEP   15.0      
+#define WINDOW     5.0     
+#define N_SAMPLES  24   
+
+int detect_intersection(void)
+{
+ /*
+  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
+  * you like, but it should be reliable and robust.
+  * 
+  * The return value should be 1 if an intersection is detected, and 0 otherwise.
+  */   
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = classify_color_hsv(R, G, B, A);
+    if (color == C_BLACK) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
+}
+
+int detect_intersection_or_street(void){
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = classify_color_hsv(R, G, B, A);
+    if (color == 1 || color == 5) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow) or Street (Black)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection or street\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
+}
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
 
 int detect_intersection_or_street(void){
   int R, G, B, A;
@@ -60,7 +116,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
     sleep(1);
    // intialize gyro sensor
    int ref_angle = 0, rate = 0;
+<<<<<<< HEAD
     if (BT_read_gyro(PORT_GYRO, 1, &ref_angle, &rate) != 1) {
+=======
+    if (BT_read_gyro(GYRO_PORT, 1, &ref_angle, &rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
         fprintf(stderr, "Failed to reset gyro sensor.\n");
         return -1;
     } else {
@@ -69,14 +129,23 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
     sleep(1); // Wait a moment for the gyro to stabilize
     // drive forwarde to the start point of scan
+<<<<<<< HEAD
     BT_timed_motor_port_start(MOTOR_A, 7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
     BT_timed_motor_port_start(MOTOR_D, 6, 120, 1380, 100); // Start motor C with power 6, ramp up time 500ms
+=======
+    BT_timed_motor_port_start(LEFT_MOTOR, 7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 120, 1380, 100); // Start motor C with power 6, ramp up time 500ms
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
    // BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
     fprintf(stderr, "Drive forward to start point of scan.\n");
     sleep(3); // Wait for the bot to reach the start point
     // ADD A ANGLE CHECK HERE TO ENSURE IT IS STRAIGHT
       int  current_angle = 0, current_rate = 0;
+<<<<<<< HEAD
     if (BT_read_gyro(PORT_GYRO, 0, &current_angle, &current_rate) != 1) {
+=======
+    if (BT_read_gyro(GYRO_PORT, 0, &current_angle, &current_rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
         fprintf(stderr, "Failed to read gyro sensor for angle check.\n");
         return -1;
     } else {
@@ -103,8 +172,13 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         int start_color = 6;
         {
             int R, G, B, A;
+<<<<<<< HEAD
             if (BT_read_colour_RGBraw_NXT(PORT_COLOR, &R, &G, &B, &A) == 1) {
                 start_color = classify_color_euclidean(R, G, B, A);
+=======
+            if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+                start_color = classify_color_hsv(R, G, B, A);
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                 fprintf(stderr, "Start color scan: RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d), color index = %d\n",
                         R, G, B, A, R + A, G + A, B + A, start_color);
             } else {
@@ -115,12 +189,20 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
         fprintf(stderr, "Testing turn right with 12x30° scan...\n");
         // Start turning right --> Clockwise 360 degrees
+<<<<<<< HEAD
         BT_turn(MOTOR_LEFT, 13, MOTOR_RIGHT, -9);
+=======
+        BT_turn(LEFT_MOTOR, 13, RIGHT_MOTOR, -9);
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
 
         // angle check and color scanning
         while (theta_sum < 360.0 + 0.5) {  
             int angle_raw = 0;
+<<<<<<< HEAD
             if (BT_read_gyro(PORT_GYRO, 0, &angle_raw, &rate) != 1) {
+=======
+            if (BT_read_gyro(GYRO_PORT, 0, &angle_raw, &rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
             }
@@ -138,7 +220,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                 double target = k * DEG_STEP;
                 if (sampled_right[k] == -1.0 && fabs(wrap180(theta_norm - target)) < WINDOW) {
                     int R, G, B, A;
+<<<<<<< HEAD
                     if (BT_read_colour_RGBraw_NXT(PORT_COLOR, &R, &G, &B, &A) == 1) {
+=======
+                    if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                         color_samples_right[k][0] = R;
                         color_samples_right[k][1] = G;
                         color_samples_right[k][2] = B;
@@ -154,7 +240,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
            // usleep(5000);  // 5 ms 
         }
 
+<<<<<<< HEAD
         BT_motor_port_stop(MOTOR_LEFT | MOTOR_RIGHT, 1);  // stop while finish 360 degree turn
+=======
+        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // stop while finish 360 degree turn
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
         fprintf(stderr, "Finished clockwise rotation at %.1f° total.\n", theta_sum);
         sleep(1); // wait for a while
 
@@ -165,12 +255,20 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
         fprintf(stderr, "Testing turn left counter-clockwise with 12x30° scan...\n");
         // Start turning left --> Counter-clockwise 360 degrees
+<<<<<<< HEAD
         BT_turn(MOTOR_LEFT, -10, MOTOR_RIGHT, 12);
+=======
+        BT_turn(LEFT_MOTOR, -10, RIGHT_MOTOR, 12);
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
 
         // angle check and color scanning
         while (fabs(theta_sum) < 360.0 - 2) {
             int angle_raw = 0;
+<<<<<<< HEAD
             if (BT_read_gyro(PORT_GYRO, 0, &angle_raw, &rate) != 1) {
+=======
+            if (BT_read_gyro(GYRO_PORT, 0, &angle_raw, &rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
             }
@@ -187,7 +285,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                 double target = -k * DEG_STEP;
                 if (sampled_left[k] == -1.0 && fabs(wrap180(theta_norm - target)) < WINDOW) {
                     int R, G, B, A;
+<<<<<<< HEAD
                     if (BT_read_colour_RGBraw_NXT(PORT_COLOR, &R, &G, &B, &A) == 1) {
+=======
+                    if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                         color_samples_left[k][0] = R;
                         color_samples_left[k][1] = G;
                         color_samples_left[k][2] = B;
@@ -202,7 +304,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
            // usleep(5000);  // 5 ms
         }
 
+<<<<<<< HEAD
         BT_motor_port_stop(MOTOR_LEFT | MOTOR_RIGHT, 1);  // Stop after completing 360-degree turn
+=======
+        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop after completing 360-degree turn
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
         fprintf(stderr, "Finished counter-clockwise rotation at %.1f° total.\n", theta_sum);
         sleep(1); // Wait for a while
         // Arrays to store color indices
@@ -212,7 +318,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         // Print all collected samples
         fprintf(stderr, "Right turn samples:\n");
         for (int i = 0; i < N_SAMPLES; ++i) {
+<<<<<<< HEAD
             color_indices_right[i] = classify_color_euclidean(
+=======
+            color_indices_right[i] = classify_color_hsv(
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
             color_samples_right[i][0], color_samples_right[i][1],
             color_samples_right[i][2], color_samples_right[i][3]);
 
@@ -226,7 +336,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
         fprintf(stderr, "Left turn samples:\n");
         for (int i = 0; i < N_SAMPLES; ++i) {
+<<<<<<< HEAD
             color_indices_left[N_SAMPLES - 1 - i] = classify_color_euclidean(
+=======
+            color_indices_left[N_SAMPLES - 1 - i] = classify_color_hsv(
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
             color_samples_left[i][0], color_samples_left[i][1],
             color_samples_left[i][2], color_samples_left[i][3]);
 
@@ -239,7 +353,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
         }
 
         // Print both arrays with their color indices and corresponding colors
+<<<<<<< HEAD
         const char *color_names[] = {"RED", "YELLOW", "GREEN", "BLUE", "WHITE", "BLACK", "UNKNOWN"};
+=======
+        const char *color_names[] = {"BLACK", "WHITE", "RED", "YELLOW", "GREEN", "BLUE", "UNKNOWN"};
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
         fprintf(stderr, "Comparing Right and Left turn samples:\n");
         for (int i = 0; i < N_SAMPLES; ++i) {
             if (sampled_right[i] == -1.0) {
@@ -309,7 +427,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                 int best_color = 6; // Default to UNKNOWN
                 for (int color = 0; color < 7; ++color) {
                 // Only consider blue, green, or white
+<<<<<<< HEAD
                 if ((color == 3 || color == 2 || color == 4) && color_vote[region][color] > max_votes) {
+=======
+                if ((color == C_BLUE || color == C_GREEN || color == C_WHITE) && color_vote[region][color] > max_votes) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                     max_votes = color_vote[region][color];
                     best_color = color;
                 }
@@ -332,7 +454,11 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     total_votes += color_vote[region][color];
                 }
 
+<<<<<<< HEAD
                 if (region_color[region] == 6 || (unknown_votes / total_votes > 0.5)) {
+=======
+                if (region_color[region] == C_OTHER || (unknown_votes / total_votes > 0.5)) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                     fprintf(stderr, "Region %d has unknown color or over 50%% unknown votes. Performing specified check...\n", region);
 
                     // Calculate average angle for unknown color in this region
@@ -363,28 +489,50 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     for (int a = 0; a < 2; ++a) {
                         double angle_to_check = angles_to_check[a];
                         int current_angle = 0, current_rate = 0;
+<<<<<<< HEAD
                         if (BT_read_gyro(PORT_GYRO, 0, &current_angle, &current_rate) == 1) {
+=======
+                        if (BT_read_gyro(GYRO_PORT, 0, &current_angle, &current_rate) == 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                              if (fabs(wrap180(angle_to_check - current_angle)) <= 2.0){
                                 break;
                              }
                              else if (angle_to_check - current_angle > 0){
+<<<<<<< HEAD
                                     BT_turn(MOTOR_LEFT, 13, MOTOR_RIGHT, -9);
                                 } else {
                                     BT_turn(MOTOR_LEFT, -10, MOTOR_RIGHT, 12);
                                 }
                             while (fabs(wrap180(angle_to_check - current_angle)) > 2.0) { 
                                 if (BT_read_gyro(PORT_GYRO, 0, &current_angle, &current_rate) != 1) {
+=======
+                                    BT_turn(LEFT_MOTOR, 13, RIGHT_MOTOR, -9);
+                                } else {
+                                    BT_turn(LEFT_MOTOR, -10, RIGHT_MOTOR, 12);
+                                }
+                            while (fabs(wrap180(angle_to_check - current_angle)) > 2.0) {
+                                if (BT_read_gyro(GYRO_PORT, 0, &current_angle, &current_rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                                     fprintf(stderr, "Failed to read gyro sensor during turn.\n");
                                     break;
                                 }
                             }
+<<<<<<< HEAD
                             BT_motor_port_stop(MOTOR_LEFT | MOTOR_RIGHT, 1); // Stop motors after turning
+=======
+                            BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1); // Stop motors after turning
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                         } else {
                             fprintf(stderr, "Failed to read gyro sensor for angle adjustment.\n");
                         } 
                         int R, G, B, A;
+<<<<<<< HEAD
                         if (BT_read_colour_RGBraw_NXT(PORT_COLOR, &R, &G, &B, &A) == 1) {
                             int exact_color = classify_color_euclidean(R, G, B, A);
+=======
+                        if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
+                            int exact_color = classify_color_hsv(R, G, B, A);
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                             double weight = 20.0; // Assign a high weight for this exact check
                             color_vote[region][exact_color] += weight;
 
@@ -398,9 +546,15 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
                     // Recalculate the final color for this region
                     double max_votes = 0;
+<<<<<<< HEAD
                     int best_color = 6; // Default to UNKNOWN
                     for (int color = 0; color < 7; ++color) {
                         if ((color == 1 || color == 4 || color == 5) && color_vote[region][color] > max_votes) {
+=======
+                    int best_color = C_OTHER; // Default to UNKNOWN
+                    for (int color = 0; color < 7; ++color) {
+                        if ((color == C_BLUE || color == C_GREEN || color == C_WHITE) && color_vote[region][color] > max_votes) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                             max_votes = color_vote[region][color];
                             best_color = color;
                         }
@@ -415,6 +569,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
             // Rotate back to the initial angle (angle = 0)
             int final_angle = 0, final_rate = 0;
+<<<<<<< HEAD
             if (BT_read_gyro(PORT_GYRO, 0, &final_angle, &final_rate) == 1) {
                 double target_angle = wrap360(final_angle);
                  if (wrap180(target_angle) > 0) {
@@ -424,19 +579,39 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     }
                 while (fabs(wrap180(target_angle)) > 2.0) {
                     if (BT_read_gyro(PORT_GYRO, 0, &final_angle, &final_rate) != 1) {
+=======
+            if (BT_read_gyro(GYRO_PORT, 0, &final_angle, &final_rate) == 1) {
+                double target_angle = wrap360(final_angle);
+                 if (wrap180(target_angle) > 0) {
+                        BT_turn(LEFT_MOTOR, -10, RIGHT_MOTOR, 12); // Turn left
+                    } else {
+                        BT_turn(LEFT_MOTOR, 13, RIGHT_MOTOR, -9); // Turn right
+                    }
+                while (fabs(wrap180(target_angle)) > 2.0) {
+                    if (BT_read_gyro(GYRO_PORT, 0, &final_angle, &final_rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                         fprintf(stderr, "Failed to read gyro sensor during return to initial angle.\n");
                         break;
                     }
                     target_angle = wrap360(final_angle);
                 }
+<<<<<<< HEAD
                 BT_motor_port_stop(MOTOR_LEFT | MOTOR_RIGHT, 1); // Stop motors after adjustment
+=======
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1); // Stop motors after adjustment
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                 fprintf(stderr, "Returned to initial angle (0°).\n");
             } else {
                 fprintf(stderr, "Failed to read gyro sensor for final angle adjustment.\n");
             }
 
+<<<<<<< HEAD
         BT_timed_motor_port_start(MOTOR_A, -7, 80, 1400, 100); 
         BT_timed_motor_port_start(MOTOR_D, -6, 100, 1380, 100);
+=======
+        BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1400, 100);
+        BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1380, 100);
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
 
         sleep(2); // Wait for the bot to return to original position
         fprintf(stderr, "Scan complete.\n");
@@ -455,40 +630,83 @@ int leftright_turn_degrees(int direction, double target_angle){
     int angle = 0, rate = 0;
 
     /* Reset gyro to zero */
+<<<<<<< HEAD
     if (BT_read_gyro(PORT_GYRO, 1, &angle, &rate) != 1) {
+=======
+    if (BT_read_gyro(GYRO_PORT, 1, &angle, &rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
         fprintf(stderr, "Failed to reset gyro sensor.\n");
         return -1;
     }
 
+<<<<<<< HEAD
     BT_timed_motor_port_start(MOTOR_A, 7, 80, 600, 80);
     BT_timed_motor_port_start(MOTOR_D, 6, 80, 600, 80);
+=======
+    BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 600, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 80, 600, 80);
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
     usleep(1000);
 
     if (direction == 1) {
         /* Turn right */
+<<<<<<< HEAD
          BT_turn(MOTOR_A, 15, MOTOR_D, -10);
         /* Monitor until angle reaches about +90 degrees */
         while (angle < target_angle - 0.5) {
             if (BT_read_gyro(PORT_GYRO, 0, &angle, &rate) != 1) {
+=======
+         BT_turn(LEFT_MOTOR, 15, RIGHT_MOTOR, -10);
+        /* Monitor until angle reaches about +90 degrees */
+        while (angle < target_angle - 0.5) {
+            if (BT_read_gyro(GYRO_PORT, 0, &angle, &rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
             }
          //   fprintf(stderr, "Turning right: Current angle = %d\n", angle);
         }
     } else {
+<<<<<<< HEAD
         BT_turn(MOTOR_A, -10, MOTOR_D, 13);
 
         // Monitor the angle until it reaches 90 degrees
         while (angle > -target_angle + 0.5) {
             if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
+=======
+        BT_turn(LEFT_MOTOR, -10, RIGHT_MOTOR, 13);
+
+        // Monitor the angle until it reaches 90 degrees
+        while (angle > -target_angle + 0.5) {
+            if (BT_read_gyro(GYRO_PORT, 0, &angle, &rate) != 1) {
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
             }
         }
     }
     // Stop the motors
+<<<<<<< HEAD
     BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
     sleep(1);
+=======
+    BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop with active brake
+    usleep(10000);
+
+    return 1;
+}
+
+int turn_right_90_degrees(){
+    return leftright_turn_degrees(1,90.0);
+}
+
+int turn_back_180_degrees(){
+    return leftright_turn_degrees(1,180.0);
+}
+
+int turn_left_90_degrees(){
+    return leftright_turn_degrees(-1,90.0);
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
 }
 
 int back_to_intersection(){
@@ -527,4 +745,8 @@ int back_to_intersection(){
   } else {
     fprintf(stderr, "Already on an intersection.\n");
   }
+<<<<<<< HEAD
+=======
+  return 1;
+>>>>>>> 8a6f38e (update  it with clibration and move intersection part)
 }
