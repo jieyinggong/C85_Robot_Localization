@@ -484,54 +484,40 @@ int leftright_turn_degrees(int direction, double target_angle){
     int angle = 0, rate = 0;
 
     /* Reset gyro to zero */
-    if (BT_read_gyro(GYRO_PORT, 1, &angle, &rate) != 1) {
+    if (BT_read_gyro(PORT_GYRO, 1, &angle, &rate) != 1) {
         fprintf(stderr, "Failed to reset gyro sensor.\n");
         return -1;
     }
 
-    BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 600, 80);
-    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 80, 600, 80);
+    BT_timed_motor_port_start(MOTOR_A, 7, 80, 600, 80);
+    BT_timed_motor_port_start(MOTOR_D, 6, 80, 600, 80);
     usleep(1000);
 
     if (direction == 1) {
         /* Turn right */
-         BT_turn(LEFT_MOTOR, 15, RIGHT_MOTOR, -10);
+         BT_turn(MOTOR_A, 15, MOTOR_D, -10);
         /* Monitor until angle reaches about +90 degrees */
         while (angle < target_angle - 0.5) {
-            if (BT_read_gyro(GYRO_PORT, 0, &angle, &rate) != 1) {
+            if (BT_read_gyro(PORT_GYRO, 0, &angle, &rate) != 1) {
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
             }
          //   fprintf(stderr, "Turning right: Current angle = %d\n", angle);
         }
     } else {
-        BT_turn(LEFT_MOTOR, -10, RIGHT_MOTOR, 13);
+        BT_turn(MOTOR_A, -10, MOTOR_D, 13);
 
         // Monitor the angle until it reaches 90 degrees
         while (angle > -target_angle + 0.5) {
-            if (BT_read_gyro(GYRO_PORT, 0, &angle, &rate) != 1) {
+            if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
             }
         }
     }
     // Stop the motors
-    BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop with active brake
-    usleep(10000);
-
-    return 1;
-}
-
-int turn_right_90_degrees(){
-    return leftright_turn_degrees(1,90.0);
-}
-
-int turn_back_180_degrees(){
-    return leftright_turn_degrees(1,180.0);
-}
-
-int turn_left_90_degrees(){
-    return leftright_turn_degrees(-1,90.0);
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
+    sleep(1);
 }
 
 int back_to_intersection(){
@@ -570,47 +556,4 @@ int back_to_intersection(){
   } else {
     fprintf(stderr, "Already on an intersection.\n");
   }
-  return 1;
-}
-
-int drive_along_street(void)
-{
- /*
-  * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
-  * the map. It stops at an intersection.
-  * 
-  * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
-  * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
-  * or the course instructor for help carrying out your plan.
-  * 
-  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
-  * bot after calling this function.
-  */   
-
-  // Test driving forward
-  fprintf(stderr, "Testing drive forward...\n");
-  //BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
-
-  // Test stopping with brake mode
-  // stop when detect intersection
-  int detected = detect_intersection();
-  int start_flag = 0;
-  while (detected == 0) {
-    if (start_flag == 0){
-        fprintf(stderr, "Driving along the street...\n");
-        start_flag = 1;
-          BT_drive(LEFT_MOTOR, RIGHT_MOTOR, 6, 5);
-    }
-    detected = detect_intersection();
-  }
-  BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
-  if (detected == 1){
-      fprintf(stderr, "Intersection detected during drive.\n");
-  }
-  if (detected == 2){
-      fprintf(stderr, "Not on street nor intersection during drive.\n");
-  }
-  sleep(1);
-  return 1;
-  //return(0);
 }
