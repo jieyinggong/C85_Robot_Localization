@@ -91,6 +91,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
+// Added headers to avoid implicit declaration warnings for standard functions
+#include <stdio.h>
+#include <string.h>
 
 #define DIR_UP    0
 #define DIR_RIGHT 1
@@ -490,7 +493,7 @@ int main(int argc, char *argv[])
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
  int robot_x = -1;
- int robot_y = -1
+ int robot_y = -1;
  int direction = 0;
  robot_localization(&robot_x, &robot_y, &direction);
  fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
@@ -692,15 +695,57 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
     lastMoveDir = moveDir;
   }
 
- // Return an invalid location/direction and notify that localization was unsuccessful (you will delete this and replace it
- // with your code).
- return(0);
+ // Localization succeeded (we broke out of the loop when confident)
+ return 1;
 }
 
 static int localization_still_ok(void){
   int bi, bd; double bv;
   current_argmax(&bi,&bd,&bv);
   return (bv >= NAV_CERTAINTY_THRESHOLD);
+}
+
+static int perform_step_and_check(int moveDir, int *pCurX, int *pCurY, int *pCurDir, int *pStepCounter)
+{
+  // Execute physical movement
+  execute_move(moveDir);
+
+  // Motion (mathematical) update
+  actionModel(moveDir);
+  normalize_beliefs();
+
+  (*pStepCounter)++;
+
+  // Possibly scan at this intersection according to NAV_SCAN_EVERY_STEPS
+  if ((*pStepCounter) % NAV_SCAN_EVERY_STEPS == 0){
+    int tl,tr,br,bl;
+    if (scan_intersection(&tl,&tr,&br,&bl)){
+      int z[4] = {tl,tr,br,bl};
+      updateBelief(moveDir, z);
+      normalize_beliefs();
+    } else {
+      // If scan failed, be conservative but continue; still check localization
+      int dummy_tl=-1,dummy_tr=-1,dummy_br=-1,dummy_bl=-1;
+      int z[4] = {dummy_tl,dummy_tr,dummy_br,dummy_bl};
+      updateBelief(moveDir, z);
+      normalize_beliefs();
+    }
+
+    if (!localization_still_ok()){
+      return 0; // LOST
+    }
+  }
+
+  // Update current best estimate from beliefs
+  {
+    int bi, bd; double bv;
+    current_argmax(&bi,&bd,&bv);
+    *pCurX = idx_to_x(bi);
+    *pCurY = idx_to_y(bi);
+    *pCurDir = bd;
+  }
+
+  return 1;
 }
 
 int go_to_target(int robot_x, int robot_y, int direction, int target_x, int target_y)
@@ -735,51 +780,18 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
 
   int stepCounter = 0;
 
-  // 一个小lambda：走一步，并在路口做一次观测+更新+检查
-  auto do_step_and_check = [&](int moveDir)->int {
-    // 执行动作（真实世界）
-    execute_move(moveDir);
-
-    // 信念迁移（数学模型）
-    actionModel(moveDir);
-    normalize_beliefs();
-
-    stepCounter++;
-
-    // 每隔 NAV_SCAN_EVERY_STEPS 个路口做一次观测与测量更新（建议每个路口都做）
-    if (stepCounter % NAV_SCAN_EVERY_STEPS == 0){
-      int tl,tr,br,bl; scan_intersection(&tl,&tr,&br,&bl);
-      int z[4] = {tl,tr,br,bl};
-      updateBelief(moveDir, z);
-      normalize_beliefs();
-      if (!localization_still_ok()){
-        // 定位可信度下降，返回 LOST
-        return 0;
-      }
-    }
-
-    // 更新我们对“当前真实栅格/朝向”的估计（用 argmax）
-    int bi, bd; double bv;
-    current_argmax(&bi,&bd,&bv);
-    cur_x = idx_to_x(bi);
-    cur_y = idx_to_y(bi);
-    cur_dir = bd;
-
-    return 1;
-  };
-
   // 1) 先走 X 方向
   while (cur_x != target_x){
     int moveDir = (target_x > cur_x) ? DIR_RIGHT : DIR_LEFT;
-    if (!do_step_and_check(moveDir)) return 0;  // LOST → 让 main 触发重定位
+    if (!perform_step_and_check(moveDir, &cur_x, &cur_y, &cur_dir, &stepCounter)) return 0;  // LOST → 让 main 触发重定位
   }
 
   // 2) 再走 Y 方向
   while (cur_y != target_y){
     int moveDir = (target_y > cur_y) ? DIR_DOWN : DIR_UP;
-    if (!do_step_and_check(moveDir)) return 0;  // LOST → 让 main 触发重定位
+    if (!perform_step_and_check(moveDir, &cur_x, &cur_y, &cur_dir, &stepCounter)) return 0;  // LOST → 让 main 触发重定位
   }
-
+ 
   // 到达目标格后再做一次确认扫描（可选，增强鲁棒性）
   {
     int tl,tr,br,bl; scan_intersection(&tl,&tr,&br,&bl);
@@ -792,9 +804,9 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   }
 
   return 1; // 成功到达
-}
-
-void calibrate_sensor(void)
+ }
+ 
+ void calibrate_sensor(void)
 {
  /*
   * This function is called when the program is started with -1  -1 for the target location. 
