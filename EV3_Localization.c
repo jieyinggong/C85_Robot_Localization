@@ -87,6 +87,40 @@
 */
 
 #include "EV3_Localization.h"
+#include "calibration.h"
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+// Added headers to avoid implicit declaration warnings for standard functions
+#include <stdio.h>
+#include <string.h>
+#include "EV3_RobotControl/btcomm.h"
+
+#define DIR_UP    0
+#define DIR_RIGHT 1
+#define DIR_DOWN  2
+#define DIR_LEFT  3
+
+#ifndef CIDX_DEFINED
+#define CIDX_DEFINED
+#define C_BLACK  0
+#define C_WHITE  1
+#define C_RED    2
+#define C_YELLOW 3
+#define C_GREEN  4
+#define C_BLUE   5
+#endif
+
+#define COLOR_PORT PORT_1
+#define GYRO_PORT PORT_2
+#define LEFT_MOTOR MOTOR_A
+#define RIGHT_MOTOR MOTOR_D
+
+#define MIN_SCANS_TO_CONFIRM 3
+#define CERTAINTY_THRESHOLD  0.80
+#define MASS_EPS             1e-9
+#define NAV_CERTAINTY_THRESHOLD  0.65   // 导航阶段的“仍然定位”阈值，可以稍低于定位完成阈值
+#define NAV_SCAN_EVERY_STEPS     1      // 每经过几个路口做一次扫描；设为1表示每个路口都扫描
 
 int map[400][4];            // This holds the representation of the map, up to 20x20
                             // intersections, raster ordered, 4 building colours per
@@ -94,30 +128,260 @@ int map[400][4];            // This holds the representation of the map, up to 2
 int sx, sy;                 // Size of the map (number of intersections along x and y)
 double beliefs[400][4];     // Beliefs for each location and motion direction
 
-int get_color_from_rgb(int R, int G, int B, int A) {
-  // Thresholds for color detection
-  const int RED_THRESHOLD = 200;
-  const int GREEN_THRESHOLD = 200;
-  const int BLUE_THRESHOLD = 200;
-  const int BLACK_THRESHOLD = 50;
-  const int WHITE_THRESHOLD = 600;
+HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
+ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
 
-  int brightness = R + G + B;
+// ColorProbability color_probabilities[COLOR_COUNT];  // holds color probabilities read from file
+// HSVRange ranges[COLOR_COUNT]; // holds color calibration read from file
 
-  if (brightness < BLACK_THRESHOLD || A > 80) {
-    return 4;  // Black
-  } else if (brightness > WHITE_THRESHOLD || A < 10) {
-    return 5;  // White
-  } else if (R > RED_THRESHOLD && G < GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 0;  // Red
-  } else if (R > RED_THRESHOLD && G > GREEN_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 1;  // Yellow
-  } else if (G > GREEN_THRESHOLD && R < RED_THRESHOLD && B < BLUE_THRESHOLD) {
-    return 2;  // Green
-  } else if (B > BLUE_THRESHOLD && R < RED_THRESHOLD && G < GREEN_THRESHOLD) {
-    return 3;  // Blue
-  } else {
-    return 6;  // Other
+// ---- Local tiny helpers in this translation unit ----
+static inline int idx_to_x(int idx){ return idx % sx; }
+static inline int idx_to_y(int idx){ return idx / sx; }
+static inline int xy_to_idx(int x,int y){ return x + y*sx; }
+
+// sum of all beliefs (for normalization)
+static double sum_all_beliefs(void){
+  double s = 0.0;
+  for(int i=0;i<sx*sy;i++)
+    for(int d=0; d<4; d++) s += beliefs[i][d];
+  return s;
+}
+
+static void normalize_beliefs(void){
+  double s = sum_all_beliefs();
+  if (s < MASS_EPS) return; // avoid divide-by-zero; if this happens, your update produced degenerate mass
+  double inv = 1.0 / s;
+  for(int i=0;i<sx*sy;i++)
+    for(int d=0; d<4; d++) beliefs[i][d] *= inv;
+}
+
+static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
+  *bestIdx = 0; *bestDir = 0; *bestVal = -1.0;
+  for(int i=0;i<sx*sy;i++){
+    for(int d=0; d<4; d++){
+      if (beliefs[i][d] > *bestVal){
+        *bestVal = beliefs[i][d];
+        *bestIdx = i;
+        *bestDir = d;
+      }
+    }
+  }
+}
+
+// compute which absolute move directions are *globally feasible* given current belief mass:
+// a direction is feasible if moving that way doesn't exit the grid for a non-trivial portion of belief.
+static int build_feasible_directions(int outDirs[4]){
+  double mass[4] = {0,0,0,0};
+  for(int i=0;i<sx*sy;i++){
+    // total mass at intersection i across all headings
+    double mi = beliefs[i][0]+beliefs[i][1]+beliefs[i][2]+beliefs[i][3];
+    if (mi < MASS_EPS) continue;
+    int x = idx_to_x(i), y = idx_to_y(i);
+    if (y > 0)          mass[DIR_UP]    += mi; // can move up
+    if (x < sx-1)       mass[DIR_RIGHT] += mi; // can move right
+    if (y < sy-1)       mass[DIR_DOWN]  += mi; // can move down
+    if (x > 0)          mass[DIR_LEFT]  += mi; // can move left
+  }
+  int n=0;
+  for(int d=0; d<4; d++){
+    if (mass[d] > MASS_EPS) outDirs[n++] = d;
+  }
+  // Fallback: if somehow empty, allow all 4 (should rarely happen)
+  if (n == 0){
+    outDirs[0]=DIR_UP; outDirs[1]=DIR_RIGHT; outDirs[2]=DIR_DOWN; outDirs[3]=DIR_LEFT;
+    n = 4;
+  }
+  return n;
+}
+
+// execute the chosen move: turn to absolute dir, leave the intersection, and follow street to next one
+static void execute_move(int absDir){
+  turn_at_intersection(absDir);  // your helper aligns & points to desired absolute direction
+  drive_along_street();          // cross intersection + follow the black line to the next intersection
+}
+
+// 将地图四角(TL,TR,BR,BL)按朝向 dir 顺时针旋转 dir 步，得到“机器人视角下应看到的顺序”
+static inline void expected_corners_for_dir(int idx, int dir, int out4[4]){
+  // map[idx] = [TL, TR, BR, BL] (clockwise)
+  // 面向UP:   期望 = [TL, TR, BR, BL]
+  // 面向RIGHT:期望 = [TR, BR, BL, TL]   (顺时针移动1位)
+  // 面向DOWN: 期望 = [BR, BL, TL, TR]   (顺时针移动2位)
+  // 面向LEFT: 期望 = [BL, TL, TR, BR]   (顺时针移动3位)
+  int base[4] = { map[idx][0], map[idx][1], map[idx][2], map[idx][3] };
+  for(int k=0;k<4;k++){
+    out4[k] = base[(k + dir) & 3]; // 等价于 (k+dir)%4
+  }
+}
+
+// 从 color_probabilities[] 取命中率；若未加载或异常，给一个保守默认值
+static inline double get_color_hit_prob(int c){
+  // 仅对 WHITE/GREEN/BLUE 用到（交叉口），其余颜色用不到也返回个默认
+  if (c < 0 || c > 5) return 0.85;
+  double p = color_probabilities[c].probability;
+  if (!(p > 0.0 && p < 1.0)) {
+    // 合理默认：传感器分类在“期待为该色”时的命中率
+    // 你也可以给不同颜色不同默认，比如白 0.92、绿 0.88、蓝 0.90
+    p = 0.90;
+  }
+  // 稍作夹取，避免 0 或 1 导致数值问题
+  if (p < 0.55) p = 0.55;
+  if (p > 0.99) p = 0.99;
+  return p;
+}
+
+static inline int is_allowed_corner_colour(int c){
+  return (c == C_WHITE || c == C_GREEN || c == C_BLUE);
+}
+
+// --------------------------------- 似然模型（简单稳健版）---------------------------------
+// 读数 readings: [tl, tr, br, bl]
+// 期望 expect:    [tl, tr, br, bl]（已按朝向对齐）
+// 返回 P(z|s)：逐角相乘（匹配给高权，不匹配给低权；允许“未知”时给中等权）
+static inline double sensor_likelihood_4(const int readings[4], const int expect[4]){
+  // 对未知读数的保守概率（可调）：既不过分惩罚，也不鼓励
+  const double p_unknown = 0.50;
+
+  double p_total = 1.0;
+
+  for (int k = 0; k < 4; k++){
+    const int e = expect[k];         // 期望颜色（一定应在 {W,G,B}）
+    const int z = readings[k];       // 传感器读到的颜色（可能是 -1 未知）
+
+    // 防御：若地图标注不在允许集，给个很小概率，避免把分布完全冲没
+    if (!is_allowed_corner_colour(e)) {
+      p_total *= 0.05;
+      continue;
+    }
+
+    // 取“期望色 e 的命中率”作为 p_hit(e)
+    const double p_hit_e = get_color_hit_prob(e);
+
+    // 将 (1 - p_hit_e) 分给 “被误判为另外两种允许颜色”：
+    // 这里采取对称分配（也可按你后续测得的非对称混淆率再细化）
+    const double p_confuse_to_other_allowed = (1.0 - p_hit_e) / 2.0;
+
+    // 对“读到不在 {W,G,B} 的颜色”（黑/黄/红 或 未知），给更小的“离群”概率：
+    // 让它是“把 (1-p_hit_e) 中的一个很小比例分出去”，以体现少见但可能的错判
+    const double p_outlier = fmax(0.01, 0.15 * (1.0 - p_hit_e));  // 可调：0.15 表示(1-p_hit)中拿15%给离群
+
+    double pk;  // 单角似然
+
+    if (z < 0) {
+      // 未识别：保守值
+      pk = p_unknown;
+    } else if (z == e){
+      // 命中期望色
+      pk = p_hit_e;
+    } else if (is_allowed_corner_colour(z)){
+      // 被误判为另一个允许色（W/G/B 之间混淆）
+      pk = p_confuse_to_other_allowed;
+    } else {
+      // 被误判为不可能出现在角楼的颜色（黑/红/黄等）
+      pk = p_outlier;
+    }
+
+    // 夹取，避免出现 0
+    if (pk < 1e-6) pk = 1e-6;
+
+    p_total *= pk;
+  }
+
+  return p_total;
+}
+
+// ==============================================================================================
+//                                  测量更新：updateBelief
+// ==============================================================================================
+//
+// 参数：
+//   moveDir   - 上一次或下一次运动方向（如果你的测量模型需要用到“将要去的方向”，可以使用；
+//               若不用，可忽略）
+//   readings  - 当前路口观测到的四角颜色，顺序 [tl, tr, br, bl]
+//
+// 逻辑：
+//   对每个状态 s=(idx,dir)
+//     1) 取该 idx 的地图四角，并按 dir 旋转对齐到“机器人视角”
+//     2) 计算 P(z|s) 并做 Bel[s] *= P(z|s)
+//   然后全局归一化
+//
+void updateBelief(int moveDir, int readings[4])
+{
+  (void)moveDir; // 当前实现未使用，如需将来引入“朝向偏好”可利用该参数
+
+  // 一次性把所有状态都按观测更新
+  for(int idx=0; idx < sx*sy; idx++){
+    for(int dir=0; dir<4; dir++){
+      int expect[4];
+      expected_corners_for_dir(idx, dir, expect);
+      double pz = sensor_likelihood_4(readings, expect);
+      beliefs[idx][dir] *= pz;
+    }
+  }
+
+  // 归一化，保持概率分布合法
+  normalize_beliefs();
+}
+
+// ==============================================================================================
+//                                运动更新：actionModel（直线、确定性）
+// ==============================================================================================
+//
+// 参数：
+//   moveDir - 本次选择的绝对移动方向（0=UP,1=RIGHT,2=DOWN,3=LEFT）
+//
+// 逻辑：
+//   构造 newBeliefs = 0
+//   对每个 idx、任意朝向 d 的质量 mass = beliefs[idx][d]：
+//     - 计算沿 moveDir 的相邻路口 j（越界则无法转移，丢弃这部分质量）
+//     - 将 mass 加到 newBeliefs[j][moveDir] （新朝向设为 moveDir）
+//   最后：newBeliefs 归一化 → 覆盖 beliefs
+//
+void actionModel(int moveDir)
+{
+  static double newBeliefs[400][4];
+  // 清零
+  for(int i=0;i<sx*sy;i++)
+    for(int d=0; d<4; d++)
+      newBeliefs[i][d] = 0.0;
+
+  for(int idx=0; idx < sx*sy; idx++){
+    int x = idx_to_x(idx);
+    int y = idx_to_y(idx);
+
+    // 计算目的地（相邻路口）
+    int nx = x, ny = y;
+    if      (moveDir == DIR_UP)    ny = y - 1;
+    else if (moveDir == DIR_RIGHT) nx = x + 1;
+    else if (moveDir == DIR_DOWN)  ny = y + 1;
+    else if (moveDir == DIR_LEFT)  nx = x - 1;
+
+    // 越界则无法转移 —— 这部分质量被抛弃（后续会归一化）
+    if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) {
+      continue;
+    }
+
+    int j = xy_to_idx(nx, ny);
+
+    // 汇聚所有旧朝向的质量到“新格子 + 新朝向=moveDir”
+    double sumMass = beliefs[idx][0] + beliefs[idx][1] + beliefs[idx][2] + beliefs[idx][3];
+    if (sumMass > 0.0){
+      newBeliefs[j][moveDir] += sumMass;
+    }
+  }
+
+  // 将 newBeliefs 覆盖回 beliefs，并归一化
+  double total = 0.0;
+  for(int i=0;i<sx*sy;i++)
+    for(int d=0; d<4; d++){
+      beliefs[i][d] = newBeliefs[i][d];
+      total += beliefs[i][d];
+    }
+
+  if (total > MASS_EPS){
+    double inv = 1.0 / total;
+    for(int i=0;i<sx*sy;i++)
+      for(int d=0; d<4; d++)
+        beliefs[i][d] *= inv;
   }
 }
 
@@ -152,8 +416,9 @@ int main(int argc, char *argv[])
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
   *   read your calibration data for use in your localization code. Skip this if you are not using calibration
   * ****************************************************************************************************************/
- 
- 
+  read_color_calibration(ranges);
+  read_color_probability(color_probabilities);
+  
  // Your code for reading any calibration information should not go below this line //
  
  map_image=readPPMimage(&mapname[0],&rx,&ry);
@@ -236,7 +501,12 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
-
+ int robot_x = -1;
+ int robot_y = -1;
+ int direction = 0;
+ robot_localization(&robot_x, &robot_y, &direction);
+ fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
+ go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
 
  // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
  BT_close();
@@ -263,19 +533,6 @@ int drive_along_street(void)
   * bot after calling this function.
   */   
 
-  // Test driving forward
-  fprintf(stderr, "Testing drive forward...\n");
-  BT_drive(MOTOR_A, MOTOR_D, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
-
-  // Test stopping with brake mode
-  // stop when detect intersection
-  if (detect_intersection()) {
-    fprintf(stderr, "Detected intersection, stopping...\n");
-    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
-    sleep(1);
-    return 1; // Successfully reached an intersection
-  }
-
   return(0);
 }
 
@@ -288,21 +545,7 @@ int detect_intersection(void)
   * The return value should be 1 if an intersection is detected, and 0 otherwise.
   */   
   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
-  int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
-    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = get_color_from_rgb(R, G, B, A);
-    if (color == 1) { // Yellow
-      fprintf(stderr, "Detected intersection (Yellow)\n");
-      return 1;
-    } else {
-      fprintf(stderr, "Not an intersection\n");
-      return 0;
-    }
-  } else {
-    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-    return 0;
-  }
+  return(0);
 }
 
 int scan_intersection(int *tl, int *tr, int *br, int *bl)
@@ -378,6 +621,8 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
   *  drive_along_street()
   *  scan_intersection()
   *  turn_at_intersection()
+  *  void updateBelief(int moveDir, int readings[4]); // sensor update (uses last/next moveDir)
+  *  void actionModel(int moveDir);                   // motion update: shift beliefs deterministically one cell
   * 
   *  You *do not* have to use them, and can write your own to organize your robot's work as you like, they are
   *  provided as a suggestion.
@@ -412,13 +657,111 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
   /************************************************************************************************************************
    *   TO DO  -   Complete this function
    ***********************************************************************************************************************/
+  // If not already on street, acquire it first
+  // *Minty - find street and drive along it to reach an intersection
+  find_street();
+  drive_along_street();
+  // Minty*
 
- // Return an invalid location/direction and notify that localization was unsuccessful (you will delete this and replace it
- // with your code).
- *(robot_x)=-1;
- *(robot_y)=-1;
- *(direction)=-1;
- return(0);
+  // Random seed for action selection
+  srand((unsigned int)time(NULL));
+
+  int scans = 0;
+  int lastMoveDir = DIR_UP; // arbitrary init; only used by updateBelief if your design needs it
+
+  while (1)
+  {
+    // 1) Sense: scan 4 corners and do sensor (measurement) update
+    // *Minty
+    int tl,tr,br,bl;
+    scan_intersection(&tl,&tr,&br,&bl);
+    int z[4] = {tl,tr,br,bl};
+    // Minty*
+
+    updateBelief(lastMoveDir, z);   // Bayesian sensor update with your internal likelihood model
+    normalize_beliefs();
+    scans++;
+
+    // 2) Check convergence
+    int bestIdx, bestDir;
+    double bestVal;
+    current_argmax(&bestIdx, &bestDir, &bestVal);
+
+    if (scans >= MIN_SCANS_TO_CONFIRM && bestVal >= CERTAINTY_THRESHOLD){
+      // Found our location
+      *(robot_x) = idx_to_x(bestIdx);
+      *(robot_y) = idx_to_y(bestIdx);
+      *(direction) = bestDir;
+      break;
+    }
+
+    // 3) Choose a random feasible absolute direction, then execute the move
+    int dirs[4]; 
+    int n = build_feasible_directions(dirs);
+    int moveDir = dirs[rand() % n];
+
+    // *Minty
+    execute_move(moveDir);
+    // Minty*
+
+    // 4) Motion update (deterministic straight-line model provided by your helper)
+    actionModel(moveDir);
+    normalize_beliefs();
+
+    lastMoveDir = moveDir;
+  }
+
+ // Localization succeeded (we broke out of the loop when confident)
+ return 1;
+}
+
+static int localization_still_ok(void){
+  int bi, bd; double bv;
+  current_argmax(&bi,&bd,&bv);
+  return (bv >= NAV_CERTAINTY_THRESHOLD);
+}
+
+static int perform_step_and_check(int moveDir, int *pCurX, int *pCurY, int *pCurDir, int *pStepCounter)
+{
+  // Execute physical movement
+  execute_move(moveDir);
+
+  // Motion (mathematical) update
+  actionModel(moveDir);
+  normalize_beliefs();
+
+  (*pStepCounter)++;
+
+  // Possibly scan at this intersection according to NAV_SCAN_EVERY_STEPS
+  if ((*pStepCounter) % NAV_SCAN_EVERY_STEPS == 0){
+    int tl,tr,br,bl;
+    if (scan_intersection(&tl,&tr,&br,&bl)){
+      int z[4] = {tl,tr,br,bl};
+      updateBelief(moveDir, z);
+      normalize_beliefs();
+    } else {
+      // If scan failed, be conservative but continue; still check localization
+      int dummy_tl=-1,dummy_tr=-1,dummy_br=-1,dummy_bl=-1;
+      int z[4] = {dummy_tl,dummy_tr,dummy_br,dummy_bl};
+      updateBelief(moveDir, z);
+      normalize_beliefs();
+    }
+
+    if (!localization_still_ok()){
+      return 0; // LOST
+    }
+  }
+
+  // Update current best estimate from beliefs
+  {
+    int bi, bd; double bv;
+    current_argmax(&bi,&bd,&bv);
+    *pCurX = idx_to_x(bi);
+    *pCurY = idx_to_y(bi);
+    *pCurDir = bd;
+  }
+
+  return 1;
 }
 
 int go_to_target(int robot_x, int robot_y, int direction, int target_x, int target_y)
@@ -443,10 +786,43 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   TO DO  -   Complete this function
    ***********************************************************************************************************************/
-  return(0);  
-}
+  // 进入街道（以防起始时没在黑线上）
+  find_street();
 
-void calibrate_sensor(void)
+  // 这里用简单的曼哈顿路径：先水平，再垂直（你可以换成A*或别的策略）
+  int cur_x = robot_x;
+  int cur_y = robot_y;
+  int cur_dir = direction;
+
+  int stepCounter = 0;
+
+  // 1) 先走 X 方向
+  while (cur_x != target_x){
+    int moveDir = (target_x > cur_x) ? DIR_RIGHT : DIR_LEFT;
+    if (!perform_step_and_check(moveDir, &cur_x, &cur_y, &cur_dir, &stepCounter)) return 0;  // LOST → 让 main 触发重定位
+  }
+
+  // 2) 再走 Y 方向
+  while (cur_y != target_y){
+    int moveDir = (target_y > cur_y) ? DIR_DOWN : DIR_UP;
+    if (!perform_step_and_check(moveDir, &cur_x, &cur_y, &cur_dir, &stepCounter)) return 0;  // LOST → 让 main 触发重定位
+  }
+ 
+  // 到达目标格后再做一次确认扫描（可选，增强鲁棒性）
+  {
+    int tl,tr,br,bl; scan_intersection(&tl,&tr,&br,&bl);
+    int z[4] = {tl,tr,br,bl};
+    updateBelief(cur_dir, z);
+    normalize_beliefs();
+    if (!localization_still_ok()){
+      return 0; // 目标附近定位不稳，也让 main 走重定位流程
+    }
+  }
+
+  return 1; // 成功到达
+ }
+ 
+ void calibrate_sensor(void)
 {
  /*
   * This function is called when the program is started with -1  -1 for the target location. 
@@ -467,7 +843,13 @@ void calibrate_sensor(void)
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
-  fprintf(stderr,"Calibration function called!\n");  
+  color_calibration();
+  
+  printf("Calibration complete, now measuring colour probabilities...\n");
+  getchar();
+
+  color_probability(); 
+  return;
 }
 
 int parse_map(unsigned char *map_img, int rx, int ry)
