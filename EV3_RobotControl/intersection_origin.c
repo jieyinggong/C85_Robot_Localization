@@ -527,5 +527,4 @@ int back_to_intersection(){
   } else {
     fprintf(stderr, "Already on an intersection.\n");
   }
-  return 1;
 }
