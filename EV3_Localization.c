@@ -532,19 +532,6 @@ int drive_along_street(void)
   * bot after calling this function.
   */   
 
-  // Test driving forward
-  fprintf(stderr, "Testing drive forward...\n");
-  BT_drive(MOTOR_A, MOTOR_D, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
-
-  // Test stopping with brake mode
-  // stop when detect intersection
-  if (detect_intersection()) {
-    fprintf(stderr, "Detected intersection, stopping...\n");
-    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
-    sleep(1);
-    return 1; // Successfully reached an intersection
-  }
-
   return(0);
 }
 
@@ -557,21 +544,7 @@ int detect_intersection(void)
   * The return value should be 1 if an intersection is detected, and 0 otherwise.
   */   
   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
-  int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
-    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = get_color_from_rgb(R, G, B, A);
-    if (color == 1) { // Yellow
-      fprintf(stderr, "Detected intersection (Yellow)\n");
-      return 1;
-    } else {
-      fprintf(stderr, "Not an intersection\n");
-      return 0;
-    }
-  } else {
-    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-    return 0;
-  }
+  return(0);
 }
 
 int scan_intersection(int *tl, int *tr, int *br, int *bl)
@@ -603,6 +576,9 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 //   /************************************************************************************************************************
 //    *   TO DO  -   Complete this function
 //    ***********************************************************************************************************************/
+//   /************************************************************************************************************************
+//    *   TO DO  -   Complete this function
+//    ***********************************************************************************************************************/
 
 //  // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
 //  *(tl)=-1;
@@ -610,7 +586,14 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 //  *(br)=-1;
 //  *(bl)=-1;
 //  return(0);
+//  // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
+//  *(tl)=-1;
+//  *(tr)=-1;
+//  *(br)=-1;
+//  *(bl)=-1;
+//  return(0);
  
+// }
 // }
 
 int turn_at_intersection(int turn_direction)
