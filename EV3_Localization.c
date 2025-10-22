@@ -95,26 +95,25 @@
 #include <stdio.h>
 #include <string.h>
 #include "EV3_RobotControl/btcomm.h"
+#include "const.h"
 
-#define DIR_UP    0
-#define DIR_RIGHT 1
-#define DIR_DOWN  2
-#define DIR_LEFT  3
+// #define DIR_UP    0
+// #define DIR_RIGHT 1
+// #define DIR_DOWN  2
+// #define DIR_LEFT  3
 
-#ifndef CIDX_DEFINED
-#define CIDX_DEFINED
-#define C_BLACK  0
-#define C_WHITE  1
-#define C_RED    2
-#define C_YELLOW 3
-#define C_GREEN  4
-#define C_BLUE   5
-#endif
 
-#define COLOR_PORT PORT_1
-#define GYRO_PORT PORT_2
-#define LEFT_MOTOR MOTOR_A
-#define RIGHT_MOTOR MOTOR_D
+// #define C_BLACK  0
+// #define C_WHITE  1
+// #define C_RED    2
+// #define C_YELLOW 3
+// #define C_GREEN  4
+// #define C_BLUE   5
+
+// #define COLOR_PORT PORT_1
+// #define GYRO_PORT PORT_2
+// #define LEFT_MOTOR MOTOR_A
+// #define RIGHT_MOTOR MOTOR_D
 
 #define MIN_SCANS_TO_CONFIRM 3
 #define CERTAINTY_THRESHOLD  0.80
