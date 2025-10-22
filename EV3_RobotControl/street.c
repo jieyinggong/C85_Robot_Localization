@@ -1,5 +1,4 @@
 #include "street.h"
-#include "color.h"
 #include "btcomm.h"
 #include <time.h>
 #include <stdbool.h>
@@ -16,8 +15,8 @@ void verify_and_recorrect_internal(int depth)
     BT_timed_motor_port_start(MOTOR_A, 7, 80, 1000, 80);
     BT_timed_motor_port_start(MOTOR_D, 6, 100, 1000, 100);
     sleep(2);
-    BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
-    color_forward = classify_color_hsv_from_values(R, G, B, A, false);
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    color_forward =classify_color_hsv(R, G, B, A);
     printf("[Verify #%d] Forward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_forward, R, G, B, A);
 
     // back
@@ -28,8 +27,8 @@ void verify_and_recorrect_internal(int depth)
     BT_timed_motor_port_start(MOTOR_A, -7, 80, 1000, 80);
     BT_timed_motor_port_start(MOTOR_D, -6, 100, 1000, 100);
     sleep(2);
-    BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
-    color_backward = classify_color_hsv_from_values(R, G, B, A, false);
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    color_backward = classify_color_hsv(R, G, B, A);
     printf("[Verify #%d] Backward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_backward, R, G, B, A);
     BT_timed_motor_port_start(MOTOR_A, 7, 80, 1000, 80);
     BT_timed_motor_port_start(MOTOR_D, 6, 100, 1000, 100);
@@ -75,8 +74,8 @@ void recorrect_to_black_internal(int depth)
 
     while (1)
     {
-        BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
-        color = classify_color_hsv_from_values(R, G, B, A, false);
+        BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+        color =classify_color_hsv(R, G, B, A);
 
         if (color == 0 || color == 3)
         {
@@ -140,8 +139,8 @@ int find_street(void)
     srand(time(NULL));  // random seed once
 
     int R, G, B, A;
-    BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
-    color = classify_color_hsv_from_values(R, G, B, A, false);
+    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    color =classify_color_hsv(R, G, B, A);
     printf("First Color detected with RGB(%d, %d, %d, %d): %d\n", R, G, B, A, color);
     sleep(1);
     if (color == 5) // Black
@@ -154,8 +153,8 @@ int find_street(void)
     {
         // Read color sensor
         int R, G, B, A;
-        BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
-        color = classify_color_hsv_from_values(R, G, B, A, false);
+        BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+        color =classify_color_hsv(R, G, B, A);
         printf("Color detected: %d\n", color);
 
         if (color == 0) // Black
@@ -227,7 +226,7 @@ int drive_along_street(void)
   //return(0);
 }
 
-int detect_intersection(void)
+int detect_intersectionc1(void)
 {
  /*
   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
@@ -238,7 +237,7 @@ int detect_intersection(void)
   int R, G, B, A;
   if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = classify_color_euclidean(R, G, B, A);
+    int color = classify_color_hsv(R, G, B, A);
     if (color == 3) { // Yellow
       fprintf(stderr, "Detected intersection (Yellow)\n");
       return 1;
@@ -256,7 +255,7 @@ int detect_intersection_or_street1(void){
   int R, G, B, A;
   if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = classify_color_euclidean(R, G, B, A);
+    int color = classify_color_hsv(R, G, B, A);
     if (color == 0 || color == 3) { // Yellow
       fprintf(stderr, "Detected intersection (Yellow) or Street (Black)\n");
       return 1;

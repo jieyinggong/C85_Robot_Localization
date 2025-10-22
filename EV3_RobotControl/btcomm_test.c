@@ -20,30 +20,11 @@
 // from the NXT to the EV3!
 
 #include "btcomm.h"
-#include "street.h"
-#include "color.h"
-#include "intersection.h"
-
-void color_calibration();
-int classify_color_euclidean(int R, int G, int B, int A);
-void read_color_calibration();
-
-// Helper: compute average of column 'col' in an array with 'n' rows (each row has 3 cols)
-static int avg_col(int arr[][3], int n, int col) {
-	// guard
-	if (n <= 0 || col < 0 || col > 2) return 0;
-	long sum = 0;
-	for (int i = 0; i < n; i++) sum += arr[i][col];
-	return (int)(sum / n);
-}
-
-int tone_data[50][3];
-// int colors[6][3]; // global array to store color calibration data
-// Order: black, white, red, yellow, green, blue
 
 int main(int argc, char *argv[]) {
   char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
   char reply[1024];
+  int tone_data[50][3];
 
   // Reset tone data information
   for (int i = 0; i < 50; i++) {
@@ -65,58 +46,13 @@ int main(int argc, char *argv[]) {
   tone_data[3][1] = 250;
   tone_data[3][2] = 63;
 
-  int TONE_GREEN[50][3] = {
-  {330,150,30},  // E4
-  {392,150,40},  // G4
-  {523,220,50},  // C5 (land)
-  {-1,-1,-1}     // terminator
-  };
-
-  int TONE_BLUE[50][3] = {
-  {523,130,30},  // C5
-  {392,130,30},  // G4
-  {330,200,30},  // E4
-  {-1,-1,-1}
-  };
-
-  int TONE_WHITE[50][3] = {
-  {523,90,18},   // C5
-  {523,90,18},   // C5 (repeat)
-  {523,90,18},   // C5 (repeat)
-  {-1,-1,-1}
-  };
-
-  int TONE_INTERSECTION[50][3] = {
-  {880,100,40},   // A5
-  {440,100,40},   // A4
-  {880,100,45},   // A5 again (echo)
-  {660,250,50},   // E5 (hold)
-  {-1,-1,-1}
-  };
-
-  int TONE_LOCALIZATION_DONE[50][3] = {
-  {392,180,45},   // G4
-  {523,180,50},   // C5
-  {659,180,55},   // E5
-  {784,220,60},   // G5 (octave)
-  {1047,400,63},  // C6 (bright finale)
-  {-1,-1,-1}
-  };
-
-  int TONE_FAILURE[50][3] = {
-  {330,400,63},   // E4 (low, long)
-  {262,400,63},   // C4 (lower, long)
-  {196,400,63},   // G3 (lowest, long)
-  {-1,-1,-1}
-  };
-
   memset(&reply[0], 0, 1024);
 
-  // just uncomment your bot's hex key to compile for your bot, and comment the
-  // other ones out.
-  #ifndef HEXKEY
-  #define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
-  #endif
+// just uncomment your bot's hex key to compile for your bot, and comment the
+// other ones out.
+#ifndef HEXKEY
+#define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
+#endif
 
   BT_open(HEXKEY);
 
@@ -129,236 +65,55 @@ int main(int argc, char *argv[]) {
 
   read_color_calibration();
 
-  // initialize sensors
-    // intialize gyro sensor
-   int ref_angle = 0, init_rate = 0;
-    if (BT_read_gyro(PORT_2, 1, &ref_angle, &init_rate) != 1) {
-        fprintf(stderr, "Failed to reset gyro sensor.\n");
-        return -1;
-    } else {
-        fprintf(stderr, "Scan intersection: Gyro sensor reset to zero successfully.\n");
-    }
-  sleep(1); // Wait a moment for the gyro to stabilize
+  BT_play_tone_sequence(tone_data);
 
-  //TEST
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  BT_drive(MOTOR_A, MOTOR_C, 12, 10);
+  sleep(8);  // Drive for 4 seconds
 
-  leftright_turn_degrees(1,180.0); //try turn right 180
-  leftright_turn_degrees(1,90.0); //try turn right 90
-  leftright_turn_degrees(-1,90.0); //try turn left 90
-  leftright_turn_degrees(-1,180.0); //try turn left 180
+  // Test stopping with brake mode
+  fprintf(stderr, "Testing stop with brake mode...\n");
+  BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+  sleep(1);
 
-  BT_close();
-  return 0;
-  // initial color scan --> just make it work
-     int R, G, B, A;
-  for (int i = 0; i < 2; i++) {
-    if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
-      fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d) and color index = %d\n", i, R, G, B, A, R + A, G + A, B + A, classify_color_hsv_from_values(R, G, B, A, false));
-    }
+  // Test turning right
+  fprintf(stderr, "Testing turn right...\n");
+  BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn left by running motor A forward and motor B backward
+  sleep(2);
+
+  // Test turning left
+  fprintf(stderr, "Testing turn left...\n");
+  BT_turn(MOTOR_A, -50, MOTOR_C, 50);  // Turn right by running motor A backward and motor C forward
+  sleep(2);
+
+  // Test stopping without brake mode
+  fprintf(stderr, "Testing stop without brake mode...\n");
+  BT_motor_port_stop(MOTOR_A | MOTOR_C, 0);  // Stop motors A and B without active brake
+  sleep(1);
+
+  // Test reading RGB color sensor
+  fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
   }
 
-  // // check colors
-  // if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) != 1) {
-  //   fprintf(stderr, "Failed to read color sensor.\n");
-  //   return -1;
-  // }
-  // fprintf(stderr, "Read RGB = (%d, %d, %d), A= %d\n", R, G, B, A);
-
-  // // rgb + a print
-  // fprintf(stderr, "Adjusted RGB = (%d, %d, %d), A= %d\n", R + A, G + A, B + A, A);
-
-  // int color = classify_color_euclidean(R, G, B, A);
-  // if (color == 0) {
-  //   fprintf(stderr, "Color detected: Black\n");
-  // } else if (color == 1) {
-  //   fprintf(stderr, "Color detected: White\n");
-  // } else if (color == 2) {
-  //   fprintf(stderr, "Color detected: Red\n");
-  // } else if (color == 3) {
-  //   fprintf(stderr, "Color detected: Yellow\n");
-  // } else if (color == 4) {
-  //   fprintf(stderr, "Color detected: Green\n");
-  // } else if (color == 5) {
-  //   fprintf(stderr, "Color detected: Blue\n");
-  // }
-
-  int success = 0;
+  // Test reading gyro sensor and turning right 90 degrees
+  fprintf(stderr, "Testing gyro sensor for 90-degree turn...\n");
   int angle = 0, rate = 0;
 
-  // 1. starting sound
-  //BT_play_tone_sequence(tone_data);
-  sleep(1);
-
-  // 2. find street (assume robot is on random place on map)
-  // success = find_street();
-  // if (success) {
-  //   fprintf(stderr, "Street found, now correcting...\n");
-  // }
-
-  sleep(1);
-  // correct to black line
- // recorrect_to_black();
-  
-  // sleep(1);
-  // // Initialize gyro sensor and set it to zero
-  // if (BT_read_gyro(PORT_2, 1, &angle, &rate) == 1) {
-  //   fprintf(stderr, "Gyro initialized. Current angle: %d, rate: %d\n", angle, rate);
-  // } else {
-  //   fprintf(stderr, "Failed to initialize gyro sensor.\n");
-  // }
-
-  // 3. drive along street until intersection
-  // success = drive_along_street();
-  // if (success) {
-  //   fprintf(stderr, "Reached intersection!\n");
-  //  // BT_play_tone_sequence(TONE_INTERSECTION);
-  //   sleep(1);
-  // }else {
-  //   fprintf(stderr, "Failed to reach intersection.\n");
-  //   BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);
-  //  // BT_play_tone_sequence(TONE_FAILURE);
-  //   sleep(20);
-  // }
-
-  // 4. scan intersection
-  // int tl, tr, br, bl;
-  // success = scan_intersection(&tl, &tr, &br, &bl);
-  // if (success) {
-  //   fprintf(stderr, "Scan complete! Colours: TL=%d, TR=%d, BR=%d, BL=%d\n", tl, tr, br, bl);
-  //   // play tones in sequence for tl, tr, br, bl
-  //   // play tone for tl
-  //   if (tl == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (tl == 3) BT_play_tone_sequence(TONE_BLUE);
-  //   else if (tl == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  //   // play tone for tr
-  //   if (tr == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (tr == 3) BT_play_tone_sequence(TONE_BLUE);
-  //   else if (tr == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  //   // play tone for br
-  //   if (br == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (br == 3) BT_play_tone_sequence(TONE_BLUE); 
-  //   else if (br == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  //   // play tone for bl
-  //   if (bl == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (bl == 3) BT_play_tone_sequence(TONE_BLUE);
-  //   else if (bl == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  // }
-
-  // Check if the bot is on an intersection
-  // if (!detect_intersection_or_street()) {
-  //   fprintf(stderr, "Not on an intersection, adjusting position...\n");
-  // if (!detect_intersection_or_street()) {
-  //   fprintf(stderr, "Not on an intersection, adjusting position...\n");
-
-  //   // Adjust position until the intersection is detected
-  //   int adjustment_attempts = 0;
-  //   while (!detect_intersection_or_street() && adjustment_attempts < 10) {
-  //   // Adjust position until the intersection is detected
-  //   int adjustment_attempts = 0;
-  //   while (!detect_intersection_or_street() && adjustment_attempts < 10) {
-
-  //   double time = 800+adjustment_attempts*100; // increase time for each attempt
-  //     // back
-  //     BT_timed_motor_port_start(MOTOR_A, -7, 80, time, 80);
-  //     BT_timed_motor_port_start(MOTOR_D, -6, 100, time, 100);
-  //     sleep(2);
-
-  //     if (detect_intersection_or_street()) {
-  //       fprintf(stderr, "Intersection or street found after backward adjustment.\n");
-  //       break;
-  //     }
-  //     // forward
-  //     BT_timed_motor_port_start(MOTOR_A, 7, 80, time, 80);
-  //     BT_timed_motor_port_start(MOTOR_D, 6, 100, time, 100);
-  //     sleep(2);
-  //     if (detect_intersection_or_street()) {
-  //       fprintf(stderr, "Intersection or street found after forward adjustment.\n");
-  //       break;
-  //     }
-
-  //     adjustment_attempts++;
-  //   }
-  //   if (adjustment_attempts >= 10) {
-  //     fprintf(stderr, "Failed to locate intersection after multiple adjustments.\n");
-  //   }
-  // } else {
-  //   fprintf(stderr, "Already on an intersection.\n");
-  // }
-  //     adjustment_attempts++;
-  //   }
-  //   if (adjustment_attempts >= 10) {
-  //     fprintf(stderr, "Failed to locate intersection after multiple adjustments.\n");
-  //   }
-  // } else {
-  //   fprintf(stderr, "Already on an intersection.\n");
-  // }
-
-  // sleep(1);
-  // sleep(1);
-
-  // 5. turn right at intersection
   // Reset gyro sensor to zero
-  // if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
-  //   fprintf(stderr, "Failed to reset gyro sensor.\n");
-  // } else {
-  //   // Start turning right
-  //   BT_timed_motor_port_start(MOTOR_A, 7, 80, 600, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-  //   BT_timed_motor_port_start(MOTOR_D, 6, 80, 600, 80); // Start motor C with power 6, ramp up time 500ms
-  //   sleep(2);
-  //   BT_turn(MOTOR_A, 15, MOTOR_D, -10);  // Turn right
-
-  //   // Monitor the angle until it reaches 90 degrees
-  //   while (angle < 90) {
-  //     if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
-  //       fprintf(stderr, "Failed to read gyro sensor.\n");
-  //       break;
-  //     }
-  //     fprintf(stderr, "Current angle: %d\n", angle);
-  //   }
-  //   // Monitor the angle until it reaches 90 degrees
-  //   while (angle < 90) {
-  //     if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
-  //       fprintf(stderr, "Failed to read gyro sensor.\n");
-  //       break;
-  //     }
-  //     fprintf(stderr, "Current angle: %d\n", angle);
-  //   }
-
-  //   // Stop the motors
-  //   BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
-  // }
-  sleep(1);
-  // 6. keep going... (drive along street until next intersection)
-  // success = drive_along_street();
-  // if (success) {
-  //   fprintf(stderr, "Reached intersection again!\n");
-  //   BT_play_tone_sequence(TONE_INTERSECTION);
-  //   sleep(1);
-  // }
-
-  // // 7. turn left at intersection
-
-    if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
+  if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
     fprintf(stderr, "Failed to reset gyro sensor.\n");
   } else {
     // Start turning right
-
-    BT_timed_motor_port_start(MOTOR_A, 7, 80, 600, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(MOTOR_D, 6, 80, 600, 80); // Start motor C with power 6, ramp up time 500ms
-    sleep(1);
-
-    BT_turn(MOTOR_A, -10, MOTOR_D, 13);  // Turn left
+    BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
 
     // Monitor the angle until it reaches 90 degrees
-    while (angle > -89) {
+    while (angle < 90) {
       if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
         fprintf(stderr, "Failed to read gyro sensor.\n");
         break;
@@ -370,92 +125,6 @@ int main(int argc, char *argv[]) {
     BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
   }
 
-  // 7. done
   BT_close();
   fprintf(stderr, "Done!\n");
 }
-
-void color_calibration()
-{
-  FILE *fp = fopen("color_calibration.txt", "w");
-  if (fp == NULL) {
-    fprintf(stderr, "Failed to open file for color calibration.\n");
-    return;
-  }
-
-  for (int i=0; i<6; i++){    // Color order: black, white, red, yellow, green, blue
-      BT_play_tone_sequence(tone_data); // signal start of new color
-      sleep(5);
-
-      int store_color[100][3]; // store 100 samples
-      for (int j=0; j<100; j++){
-          int R, G, B, A;
-          if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) == 1) {
-              store_color[j][0] = R + A;
-              store_color[j][1] = G + A;
-              store_color[j][2] = B + A;
-              // print the scan and the computed color index (use classifier result, not the array)
-              // fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d) and color index = %d\n",
-              //        j, R, G, B, A, R + A, G + A, B + A,
-              //        classify_color_hsv_from_values(R, G, B, A, false));
-          } else {
-              // if read failed, store zeros to keep consistent sample count
-              store_color[j][0] = store_color[j][1] = store_color[j][2] = 0;
-          }
-          // short delay between samples may help sensor stability
-          usleep(100000); // 100 ms
-      }
-      int avg_R = avg_col(store_color, 10, 0);
-      int avg_G = avg_col(store_color, 10, 1);
-      int avg_B = avg_col(store_color, 10, 2);
-      // fprintf(stderr, "Color %d average RGB = (%d, %d, %d)\n", i, avg_R, avg_G, avg_B);
-      fprintf(fp, "Color %d average RGB = (%d, %d, %d)\n", i, avg_R, avg_G, avg_B);
-  }
-  fclose(fp);
-}
-
-
-// void read_color_calibration()
-// {
-//   FILE *fp = fopen("color_calibration.txt", "r");
-//   if (fp == NULL) {
-//     fprintf(stderr, "Failed to open file for reading color calibration.\n");
-//     return;
-//   }
-
-//   char line[100];
-//   int idx = 0;
-//   while (fgets(line, sizeof(line), fp)) {
-//     // fprintf(stderr, "%s", line); // Print each line read from the file
-//     sscanf(line, "Color %d average RGB = (%d, %d, %d)", &idx, &colors[idx][0], &colors[idx][1], &colors[idx][2]);
-//     fprintf(stderr, "Loaded Color %d average RGB = (%d, %d, %d)\n", idx, colors[idx][0], colors[idx][1], colors[idx][2]);
-//     idx++;
-//   }
-
-//   fclose(fp);
-// }
-
-// int classify_color_euclidean(int R, int G, int B, int A)
-// {
-//     int adjR = R + A;
-//     int adjG = G + A;
-//     int adjB = B + A;
-
-//     int min_index = -1;
-//     double min_dist = 1e9;
-
-//     for (int i = 0; i < 6; i++) {
-//         double dR = adjR - colors[i][0];
-//         double dG = adjG - colors[i][1];
-//         double dB = adjB - colors[i][2];
-//         double dist = sqrt(dR * dR + dG * dG + dB * dB);
-
-//         if (dist < min_dist) {
-//             min_dist = dist;
-//             min_index = i;
-//         }
-//     }
-
-//     return min_index;
-// }
-
