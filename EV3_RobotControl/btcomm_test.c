@@ -65,236 +65,55 @@ int main(int argc, char *argv[]) {
 
   read_color_calibration();
 
-  // initialize sensors
-    // intialize gyro sensor
-   int ref_angle = 0, init_rate = 0;
-    if (BT_read_gyro(PORT_2, 1, &ref_angle, &init_rate) != 1) {
-        fprintf(stderr, "Failed to reset gyro sensor.\n");
-        return -1;
-    } else {
-        fprintf(stderr, "Scan intersection: Gyro sensor reset to zero successfully.\n");
-    }
-  sleep(1); // Wait a moment for the gyro to stabilize
+  BT_play_tone_sequence(tone_data);
 
-  //TEST
+  // Test driving forward
+  fprintf(stderr, "Testing drive forward...\n");
+  BT_drive(MOTOR_A, MOTOR_C, 12, 10);
+  sleep(8);  // Drive for 4 seconds
 
-  leftright_turn_degrees(1,180.0); //try turn right 180
-  leftright_turn_degrees(1,90.0); //try turn right 90
-  leftright_turn_degrees(-1,90.0); //try turn left 90
-  leftright_turn_degrees(-1,180.0); //try turn left 180
+  // Test stopping with brake mode
+  fprintf(stderr, "Testing stop with brake mode...\n");
+  BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop motors A and B with active brake
+  sleep(1);
 
-  BT_close();
-  return 0;
-  // initial color scan --> just make it work
-     int R, G, B, A;
-  for (int i = 0; i < 2; i++) {
-    if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
-      fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d) and color index = %d\n", i, R, G, B, A, R + A, G + A, B + A, classify_color_hsv_from_values(R, G, B, A, false));
-    }
+  // Test turning right
+  fprintf(stderr, "Testing turn right...\n");
+  BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn left by running motor A forward and motor B backward
+  sleep(2);
+
+  // Test turning left
+  fprintf(stderr, "Testing turn left...\n");
+  BT_turn(MOTOR_A, -50, MOTOR_C, 50);  // Turn right by running motor A backward and motor C forward
+  sleep(2);
+
+  // Test stopping without brake mode
+  fprintf(stderr, "Testing stop without brake mode...\n");
+  BT_motor_port_stop(MOTOR_A | MOTOR_C, 0);  // Stop motors A and B without active brake
+  sleep(1);
+
+  // Test reading RGB color sensor
+  fprintf(stderr, "Testing NXT color sensor (RGB raw)...\n");
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
   }
 
-  // // check colors
-  // if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) != 1) {
-  //   fprintf(stderr, "Failed to read color sensor.\n");
-  //   return -1;
-  // }
-  // fprintf(stderr, "Read RGB = (%d, %d, %d), A= %d\n", R, G, B, A);
-
-  // // rgb + a print
-  // fprintf(stderr, "Adjusted RGB = (%d, %d, %d), A= %d\n", R + A, G + A, B + A, A);
-
-  // int color = classify_color_euclidean(R, G, B, A);
-  // if (color == 0) {
-  //   fprintf(stderr, "Color detected: Black\n");
-  // } else if (color == 1) {
-  //   fprintf(stderr, "Color detected: White\n");
-  // } else if (color == 2) {
-  //   fprintf(stderr, "Color detected: Red\n");
-  // } else if (color == 3) {
-  //   fprintf(stderr, "Color detected: Yellow\n");
-  // } else if (color == 4) {
-  //   fprintf(stderr, "Color detected: Green\n");
-  // } else if (color == 5) {
-  //   fprintf(stderr, "Color detected: Blue\n");
-  // }
-
-  int success = 0;
+  // Test reading gyro sensor and turning right 90 degrees
+  fprintf(stderr, "Testing gyro sensor for 90-degree turn...\n");
   int angle = 0, rate = 0;
 
-  // 1. starting sound
-  //BT_play_tone_sequence(tone_data);
-  sleep(1);
-
-  // 2. find street (assume robot is on random place on map)
-  // success = find_street();
-  // if (success) {
-  //   fprintf(stderr, "Street found, now correcting...\n");
-  // }
-
-  sleep(1);
-  // correct to black line
- // recorrect_to_black();
-  
-  // sleep(1);
-  // // Initialize gyro sensor and set it to zero
-  // if (BT_read_gyro(PORT_2, 1, &angle, &rate) == 1) {
-  //   fprintf(stderr, "Gyro initialized. Current angle: %d, rate: %d\n", angle, rate);
-  // } else {
-  //   fprintf(stderr, "Failed to initialize gyro sensor.\n");
-  // }
-
-  // 3. drive along street until intersection
-  // success = drive_along_street();
-  // if (success) {
-  //   fprintf(stderr, "Reached intersection!\n");
-  //  // BT_play_tone_sequence(TONE_INTERSECTION);
-  //   sleep(1);
-  // }else {
-  //   fprintf(stderr, "Failed to reach intersection.\n");
-  //   BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);
-  //  // BT_play_tone_sequence(TONE_FAILURE);
-  //   sleep(20);
-  // }
-
-  // 4. scan intersection
-  // int tl, tr, br, bl;
-  // success = scan_intersection(&tl, &tr, &br, &bl);
-  // if (success) {
-  //   fprintf(stderr, "Scan complete! Colours: TL=%d, TR=%d, BR=%d, BL=%d\n", tl, tr, br, bl);
-  //   // play tones in sequence for tl, tr, br, bl
-  //   // play tone for tl
-  //   if (tl == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (tl == 3) BT_play_tone_sequence(TONE_BLUE);
-  //   else if (tl == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  //   // play tone for tr
-  //   if (tr == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (tr == 3) BT_play_tone_sequence(TONE_BLUE);
-  //   else if (tr == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  //   // play tone for br
-  //   if (br == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (br == 3) BT_play_tone_sequence(TONE_BLUE); 
-  //   else if (br == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  //   // play tone for bl
-  //   if (bl == 2) BT_play_tone_sequence(TONE_GREEN);
-  //   else if (bl == 3) BT_play_tone_sequence(TONE_BLUE);
-  //   else if (bl == 5) BT_play_tone_sequence(TONE_WHITE);
-  //   else BT_play_tone_sequence(tone_data);
-  //   sleep(1);
-  // }
-
-  // Check if the bot is on an intersection
-  // if (!detect_intersection_or_street()) {
-  //   fprintf(stderr, "Not on an intersection, adjusting position...\n");
-  // if (!detect_intersection_or_street()) {
-  //   fprintf(stderr, "Not on an intersection, adjusting position...\n");
-
-  //   // Adjust position until the intersection is detected
-  //   int adjustment_attempts = 0;
-  //   while (!detect_intersection_or_street() && adjustment_attempts < 10) {
-  //   // Adjust position until the intersection is detected
-  //   int adjustment_attempts = 0;
-  //   while (!detect_intersection_or_street() && adjustment_attempts < 10) {
-
-  //   double time = 800+adjustment_attempts*100; // increase time for each attempt
-  //     // back
-  //     BT_timed_motor_port_start(MOTOR_A, -7, 80, time, 80);
-  //     BT_timed_motor_port_start(MOTOR_D, -6, 100, time, 100);
-  //     sleep(2);
-
-  //     if (detect_intersection_or_street()) {
-  //       fprintf(stderr, "Intersection or street found after backward adjustment.\n");
-  //       break;
-  //     }
-  //     // forward
-  //     BT_timed_motor_port_start(MOTOR_A, 7, 80, time, 80);
-  //     BT_timed_motor_port_start(MOTOR_D, 6, 100, time, 100);
-  //     sleep(2);
-  //     if (detect_intersection_or_street()) {
-  //       fprintf(stderr, "Intersection or street found after forward adjustment.\n");
-  //       break;
-  //     }
-
-  //     adjustment_attempts++;
-  //   }
-  //   if (adjustment_attempts >= 10) {
-  //     fprintf(stderr, "Failed to locate intersection after multiple adjustments.\n");
-  //   }
-  // } else {
-  //   fprintf(stderr, "Already on an intersection.\n");
-  // }
-  //     adjustment_attempts++;
-  //   }
-  //   if (adjustment_attempts >= 10) {
-  //     fprintf(stderr, "Failed to locate intersection after multiple adjustments.\n");
-  //   }
-  // } else {
-  //   fprintf(stderr, "Already on an intersection.\n");
-  // }
-
-  // sleep(1);
-  // sleep(1);
-
-  // 5. turn right at intersection
   // Reset gyro sensor to zero
-  // if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
-  //   fprintf(stderr, "Failed to reset gyro sensor.\n");
-  // } else {
-  //   // Start turning right
-  //   BT_timed_motor_port_start(MOTOR_A, 7, 80, 600, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-  //   BT_timed_motor_port_start(MOTOR_D, 6, 80, 600, 80); // Start motor C with power 6, ramp up time 500ms
-  //   sleep(2);
-  //   BT_turn(MOTOR_A, 15, MOTOR_D, -10);  // Turn right
-
-  //   // Monitor the angle until it reaches 90 degrees
-  //   while (angle < 90) {
-  //     if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
-  //       fprintf(stderr, "Failed to read gyro sensor.\n");
-  //       break;
-  //     }
-  //     fprintf(stderr, "Current angle: %d\n", angle);
-  //   }
-  //   // Monitor the angle until it reaches 90 degrees
-  //   while (angle < 90) {
-  //     if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
-  //       fprintf(stderr, "Failed to read gyro sensor.\n");
-  //       break;
-  //     }
-  //     fprintf(stderr, "Current angle: %d\n", angle);
-  //   }
-
-  //   // Stop the motors
-  //   BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
-  // }
-  sleep(1);
-  // 6. keep going... (drive along street until next intersection)
-  // success = drive_along_street();
-  // if (success) {
-  //   fprintf(stderr, "Reached intersection again!\n");
-  //   BT_play_tone_sequence(TONE_INTERSECTION);
-  //   sleep(1);
-  // }
-
-  // // 7. turn left at intersection
-
-    if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
+  if (BT_read_gyro(PORT_2, 1, &angle, &rate) != 1) {
     fprintf(stderr, "Failed to reset gyro sensor.\n");
   } else {
     // Start turning right
-
-    BT_timed_motor_port_start(MOTOR_A, 7, 80, 600, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(MOTOR_D, 6, 80, 600, 80); // Start motor C with power 6, ramp up time 500ms
-    sleep(1);
-
-    BT_turn(MOTOR_A, -10, MOTOR_D, 13);  // Turn left
+    BT_turn(MOTOR_A, 50, MOTOR_C, -50);  // Turn right
 
     // Monitor the angle until it reaches 90 degrees
-    while (angle > -89) {
+    while (angle < 90) {
       if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
         fprintf(stderr, "Failed to read gyro sensor.\n");
         break;
@@ -307,7 +126,6 @@ int main(int argc, char *argv[]) {
     BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
   }
 
-  // 7. done
   BT_close();
   fprintf(stderr, "Done!\n");
 }

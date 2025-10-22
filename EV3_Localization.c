@@ -548,6 +548,21 @@ int find_street(void)
 //   return(0);
 // }
 
+  return(0);
+}
+
+// int detect_intersection(void)
+// {
+//  /*
+//   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
+//   * you like, but it should be reliable and robust.
+//   * 
+//   * The return value should be 1 if an intersection is detected, and 0 otherwise.
+//   */   
+//   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
+//   return(0);
+// }
+
 // int scan_intersection(int *tl, int *tr, int *br, int *bl)
 // {
 //  /*
