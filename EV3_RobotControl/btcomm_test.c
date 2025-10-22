@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
 
   // name must not contain spaces or special characters
   // max name length is 12 characters
-  BT_setEV3name("R2D2");
+  //BT_setEV3name("R2D2");
 
   // initialize sensors
     // intialize gyro sensor
@@ -118,9 +118,19 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Scan intersection: Gyro sensor reset to zero successfully.\n");
     }
   sleep(1); // Wait a moment for the gyro to stabilize
+
+  //TEST
+
+  leftright_turn_degrees(1,180.0); //try turn right 180
+  leftright_turn_degrees(1,90.0); //try turn right 90
+  leftright_turn_degrees(-1,90.0); //try turn left 90
+  leftright_turn_degrees(-1,180.0); //try turn left 180
+
+  BT_close();
+  return 0;
   // initial color scan --> just make it work
      int R, G, B, A;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 2; i++) {
     if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
       fprintf(stderr, "Scan#: %d, RGB = (%d, %d, %d), A= %d and RGB adjusted = (%d, %d, %d) and color index = %d\n", i, R, G, B, A, R + A, G + A, B + A, classify_color_hsv_from_values(R, G, B, A, false));
     }

@@ -124,8 +124,7 @@ void recorrect_to_black_internal(int depth)
     printf("[Correction #%d] Completed — back on street.\n", depth);
     verify_and_recorrect_internal(depth); 
   }
-
-// External interface (unified entry point)
+ 
 void recorrect_to_black(void)
 {
     recorrect_to_black_internal(1);

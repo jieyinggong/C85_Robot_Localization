@@ -432,3 +432,81 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
     return 1; // success
  
 }
+
+int leftright_turn_degrees(int direction, double target_angle){
+    int angle = 0, rate = 0;
+
+    /* Reset gyro to zero */
+    if (BT_read_gyro(PORT_GYRO, 1, &angle, &rate) != 1) {
+        fprintf(stderr, "Failed to reset gyro sensor.\n");
+        return -1;
+    }
+
+    BT_timed_motor_port_start(MOTOR_A, 7, 80, 600, 80);
+    BT_timed_motor_port_start(MOTOR_D, 6, 80, 600, 80);
+    usleep(1000);
+
+    if (direction == 1) {
+        /* Turn right */
+         BT_turn(MOTOR_A, 15, MOTOR_D, -10);
+        /* Monitor until angle reaches about +90 degrees */
+        while (angle < target_angle - 0.5) {
+            if (BT_read_gyro(PORT_GYRO, 0, &angle, &rate) != 1) {
+                fprintf(stderr, "Failed to read gyro sensor.\n");
+                break;
+            }
+         //   fprintf(stderr, "Turning right: Current angle = %d\n", angle);
+        }
+    } else {
+        BT_turn(MOTOR_A, -10, MOTOR_D, 13);
+
+        // Monitor the angle until it reaches 90 degrees
+        while (angle > -target_angle + 0.5) {
+            if (BT_read_gyro(PORT_2, 0, &angle, &rate) != 1) {
+                fprintf(stderr, "Failed to read gyro sensor.\n");
+                break;
+            }
+        }
+    }
+    // Stop the motors
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
+    sleep(1);
+}
+
+int back_to_intersection(){
+    // Check if the bot is on an intersection
+  if (!detect_intersection_or_street()) {
+    fprintf(stderr, "Not on an intersection, adjusting position...\n");
+
+    // Adjust position until the intersection is detected
+    int adjustment_attempts = 0;
+    while (!detect_intersection_or_street() && adjustment_attempts < 10) {
+
+    double time = 800+adjustment_attempts*100; // increase time for each attempt
+      // back
+      BT_timed_motor_port_start(MOTOR_A, -7, 80, time, 80);
+      BT_timed_motor_port_start(MOTOR_D, -6, 100, time, 100);
+      sleep(2);
+
+      if (detect_intersection_or_street()) {
+        fprintf(stderr, "Intersection or street found after backward adjustment.\n");
+        break;
+      }
+      // forward
+      BT_timed_motor_port_start(MOTOR_A, 7, 80, time, 80);
+      BT_timed_motor_port_start(MOTOR_D, 6, 100, time, 100);
+      sleep(2);
+      if (detect_intersection_or_street()) {
+        fprintf(stderr, "Intersection or street found after forward adjustment.\n");
+        break;
+      }
+
+      adjustment_attempts++;
+    }
+    if (adjustment_attempts >= 10) {
+      fprintf(stderr, "Failed to locate intersection after multiple adjustments.\n");
+    }
+  } else {
+    fprintf(stderr, "Already on an intersection.\n");
+  }
+}
