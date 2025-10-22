@@ -15,8 +15,8 @@ void verify_and_recorrect_internal(int depth)
     BT_timed_motor_port_start(MOTOR_A, 7, 80, 1000, 80);
     BT_timed_motor_port_start(MOTOR_D, 6, 100, 1000, 100);
     sleep(2);
-    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
-    color_forward =classify_color_hsv(R, G, B, A);
+    BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
+    color_forward = classify_color_hsv_from_values(R, G, B, A, false);
     printf("[Verify #%d] Forward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_forward, R, G, B, A);
 
     // back
@@ -27,8 +27,8 @@ void verify_and_recorrect_internal(int depth)
     BT_timed_motor_port_start(MOTOR_A, -7, 80, 1000, 80);
     BT_timed_motor_port_start(MOTOR_D, -6, 100, 1000, 100);
     sleep(2);
-    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
-    color_backward = classify_color_euclidean(R, G, B, A);
+    BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
+    color_backward = classify_color_hsv_from_values(R, G, B, A, false);
     printf("[Verify #%d] Backward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_backward, R, G, B, A);
     BT_timed_motor_port_start(MOTOR_A, 7, 80, 1000, 80);
     BT_timed_motor_port_start(MOTOR_D, 6, 100, 1000, 100);
@@ -74,7 +74,7 @@ void recorrect_to_black_internal(int depth)
 
     while (1)
     {
-        BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+        BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
         color = classify_color_hsv_from_values(R, G, B, A, false);
 
         if (color == 0 || color == 3)
@@ -139,7 +139,7 @@ int find_street(void)
     srand(time(NULL));  // random seed once
 
     int R, G, B, A;
-    BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+    BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
     color = classify_color_hsv_from_values(R, G, B, A, false);
     printf("First Color detected with RGB(%d, %d, %d, %d): %d\n", R, G, B, A, color);
     sleep(1);
@@ -153,7 +153,7 @@ int find_street(void)
     {
         // Read color sensor
         int R, G, B, A;
-        BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
+        BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A);
         color = classify_color_hsv_from_values(R, G, B, A, false);
         printf("Color detected: %d\n", color);
 
@@ -207,12 +207,15 @@ int drive_along_street(void)
 
   // Test driving forward
   fprintf(stderr, "Testing drive forward...\n");
-  //BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+  BT_drive(MOTOR_A, MOTOR_D, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
 
   // Test stopping with brake mode
   // stop when detect intersection
-  while (detect_intersection() == 0) {
-    BT_drive(MOTOR_A, MOTOR_C, 6, 5);
+  if (detect_intersection()) {
+    fprintf(stderr, "Detected intersection, stopping...\n");
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
+    sleep(1);
+    return 1; // Successfully reached an intersection
   }
 
   fprintf(stderr, "Detected intersection, stopping...\n");
