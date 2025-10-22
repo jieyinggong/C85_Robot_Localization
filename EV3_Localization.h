@@ -68,7 +68,7 @@ code that you have to complete in order to implement the localization algorithms
 #include<malloc.h>
 #include "./EV3_RobotControl/btcomm.h"
 #include "const.h"
-#include "intersection.h"
+#include "motion.h"
 
 #ifndef HEXKEY
 	#define HEXKEY "00:16:53:55:D9:FC"	// <--- SET UP YOUR EV3's HEX ID here

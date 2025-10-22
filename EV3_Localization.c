@@ -198,6 +198,7 @@ static int build_feasible_directions(int outDirs[4]){
 // execute the chosen move: turn to absolute dir, leave the intersection, and follow street to next one
 static void execute_move(int absDir){
   turn_at_intersection(absDir);  // your helper aligns & points to desired absolute direction
+  sleep(3);
   drive_along_street();          // cross intersection + follow the black line to the next intersection
 }
 
@@ -612,6 +613,17 @@ int turn_at_intersection(int turn_direction)
   * 
   * You can use the return value to indicate success or failure, or to inform your code of the state of the bot
   */
+ // if turn direction = 0 up, 1 right, 2 down, 3 left
+ if (turn_direction == DIR_RIGHT){
+    turn_right_90_degrees();
+ }
+ else if (turn_direction == DIR_DOWN){
+    turn_back_180_degrees();
+ }
+ else if (turn_direction == DIR_LEFT){
+    turn_left_90_degrees();
+ }
+  // do nothing, already facing up
   return(0);
 }
 
@@ -671,8 +683,8 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
    ***********************************************************************************************************************/
   // If not already on street, acquire it first
   // *Minty - find street and drive along it to reach an intersection
-  find_street();
-  drive_along_street();
+  // find_street();
+  // drive_along_street();
   // Minty*
 
   // Random seed for action selection
@@ -680,6 +692,8 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
 
   int scans = 0;
   int lastMoveDir = DIR_UP; // arbitrary init; only used by updateBelief if your design needs it
+  
+  // test: assume start at a intersection
 
   while (1)
   {
