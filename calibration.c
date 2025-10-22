@@ -260,7 +260,7 @@ int classify_color_hsv(int R, int G, int B, int A)
             return i; // return color index
         }
     }
-    return -1;
+    return 6;
 }
 
 
