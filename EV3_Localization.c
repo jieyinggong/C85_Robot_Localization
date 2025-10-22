@@ -107,6 +107,11 @@
 #define C_BLUE   5
 #endif
 
+#define COLOR_PORT PORT_1
+#define GYRO_PORT PORT_2
+#define LEFT_MOTOR MOTOR_A
+#define RIGHT_MOTOR MOTOR_D
+
 #define MIN_SCANS_TO_CONFIRM 3
 #define CERTAINTY_THRESHOLD  0.80
 #define MASS_EPS             1e-9
