@@ -14,6 +14,24 @@
 #define WINDOW     5.0     
 #define N_SAMPLES  24     
 
+int detect_intersection_or_street(void){
+  int R, G, B, A;
+  if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) == 1) {
+    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
+    int color = classify_color_hsv_from_values(R, G, B, A, false);
+    if (color == 1 || color == 5) { // Yellow
+      fprintf(stderr, "Detected intersection (Yellow) or Street (Black)\n");
+      return 1;
+    } else {
+      fprintf(stderr, "Not an intersection or street\n");
+      return 0;
+    }
+  } else {
+    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
+    return 0;
+  }
+}
+
 
 //(-180,180]
 static inline double wrap180(double x){
@@ -509,4 +527,5 @@ int back_to_intersection(){
   } else {
     fprintf(stderr, "Already on an intersection.\n");
   }
+  return 1;
 }
