@@ -5,26 +5,6 @@
 #include "calibration.h"
 
 
-#define EPS 1e-6
-#define COLOR_SAMPLE_COUNT 6
-#define COLOR_READ_COUNT 100
-#define COLOR_COUNT 6
-
-typedef struct {
-    double H_min, H_max, H_avg;
-    double S_min, S_max, S_avg;
-    double V_min, V_max, V_avg;
-
-} HSVRange;
-
-typedef struct {
-    int color; 
-    double probability;
-} ColorProbability;
-
-// HSVRange ranges[6]; // store the HSV ranges for each color
-// ColorProbability color_probabilities[6]; // stores the color probabilities
-
 ////////////////////////////////////////
 // Color calibration measurement 
 ////////////////////////////////////////
@@ -168,7 +148,6 @@ void print_get_color_calibration(int i)
     
     const char *names[] = {"BLACK", "WHITE", "RED", "YELLOW", "GREEN", "BLUE"};
     printf("Place %s under the sensor and press Enter...\n", names[i]);
-    flush_stdin();
     getchar();
 }
 
@@ -220,7 +199,7 @@ void rgba_to_hsv(int R, int G, int B, int A, double *H, double *S, double *V)
 // Color determination
 ////////////////////////////////////////
 
-void read_color_calibration(void)
+void read_color_calibration(HSVRange *ranges)
 {
     FILE *fp = fopen("color_calibration.txt", "r");
     if (fp == NULL) {
@@ -285,7 +264,6 @@ void color_probability(){
         for (int j = 0; j < COLOR_SAMPLE_COUNT; j++) {
             // press enter when you are ready to measure
             printf("Place %s under the sensor and press Enter to measure probability...\n", names[i]);
-            flush_stdin();
             getchar();
 
             int R, G, B, A;
@@ -308,7 +286,7 @@ void color_probability(){
     fclose(fp);
 }
 
-void read_color_probability()
+void read_color_probability(ColorProbability *color_probabilities)
 {
     FILE *fp = fopen("color_probability.txt", "r");
     if (fp == NULL) {
@@ -325,4 +303,24 @@ void read_color_probability()
     }
 
     fclose(fp);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("Usage: %s [0] [1]\n", argv[0]);
+        return 1;
+    }
+
+    for (int i = 1; i < argc; i++) {
+        int arg = atoi(argv[i]);
+
+        if (arg == 0) {
+            color_calibration();
+        } else if (arg == 1) {
+            color_probability();
+        } else {
+            printf("Unknown argument: %s\n", argv[i]);
+        }
+    }
+    return 0;
 }

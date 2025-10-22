@@ -34,8 +34,6 @@ typedef struct {
 // Global variables
 ////////////////////////////////////////
 
-extern HSVRange ranges[COLOR_COUNT];
-extern ColorProbability color_probabilities[COLOR_COUNT];
 
 ////////////////////////////////////////
 // Color calibration
@@ -45,7 +43,6 @@ void color_calibration(void);
 void adjust_hue_overlaps(HSVRange *ranges);
 void adjust_black_white_thresholds(HSVRange *ranges);
 void print_get_color_calibration(int i);
-void flush_stdin(void);
 
 ////////////////////////////////////////
 // Color conversion
@@ -65,16 +62,7 @@ int classify_color_hsv(int R, int G, int B, int A);
 ////////////////////////////////////////
 
 void color_probability(void);
-void read_color_probability(void);
+void read_color_probability(ColorProbability *color_probabilities)
 
-// Optional: helper for getting color name
-const char* color_name(int idx);
-
-////////////////////////////////////////
-// NXT sensor reading placeholder
-////////////////////////////////////////
-
-// Replace with actual NXT color read function
-int BT_read_colour_RGBraw_NXT(int port, int *R, int *G, int *B, int *A);
 
 #endif // CALIBRATION_H

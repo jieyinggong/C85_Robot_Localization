@@ -119,6 +119,9 @@ int map[400][4];            // This holds the representation of the map, up to 2
 int sx, sy;                 // Size of the map (number of intersections along x and y)
 double beliefs[400][4];     // Beliefs for each location and motion direction
 
+ColorProbability color_probabilities[COLOR_COUNT];  // holds color probabilities read from file
+HSVRange ranges[COLOR_COUNT]; // holds color calibration read from file
+
 // ---- Local tiny helpers in this translation unit ----
 static inline int idx_to_x(int idx){ return idx % sx; }
 static inline int idx_to_y(int idx){ return idx / sx; }
@@ -401,7 +404,9 @@ int main(int argc, char *argv[])
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
   *   read your calibration data for use in your localization code. Skip this if you are not using calibration
   * ****************************************************************************************************************/
- 
+  read_color_calibration(ranges);
+  read_color_probabilities(color_probabilities);
+  
  // Your code for reading any calibration information should not go below this line //
  
  map_image=readPPMimage(&mapname[0],&rx,&ry);
@@ -810,6 +815,12 @@ void calibrate_sensor(void)
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
+  color_calibration();
+  
+  printf("Calibration complete, now measuring colour probabilities...\n");
+  getchar();
+
+  color_probability(); 
   return;
 }
 
