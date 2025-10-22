@@ -3,11 +3,15 @@
 #include <math.h>
 #include <unistd.h>
 #include "calibration.h"
+#include "EV3_RobotControl/btcomm.h"
 
 
 ////////////////////////////////////////
 // Color calibration measurement 
 ////////////////////////////////////////
+
+HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
+ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
 
 void color_calibration()
 {
@@ -37,12 +41,18 @@ void color_calibration()
 
             for (int j=0; j<COLOR_READ_COUNT; j++){
                 int R, G, B, A;
-                if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) != 1)
+                if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) != 1)
                     continue;
 
                 valid_count++;
                 double H, S, V;
                 rgba_to_hsv(R, G, B, A, &H, &S, &V);
+
+                if (i == 2){    // red case, can wrap around
+                    if (H < 180){
+                        H += 360.0;
+                    }
+                }
 
                 if (H >= 0) { //  check valid hue
                     if (H < H_min) H_min = H;
@@ -56,7 +66,7 @@ void color_calibration()
                 if (V > V_max) V_max = V;
                 V_sum += V;
 
-                usleep(100000); // 100 ms between samples
+                // usleep(100000); // 100 ms between samples
             }
         }
 
@@ -64,6 +74,12 @@ void color_calibration()
         H_avg = H_sum / (valid_count);
         S_avg = S_sum / (valid_count);
         V_avg = V_sum / (valid_count);
+
+        if (i == 2){ 
+            if (H_max >= 360.0) H_max -= 360.0;
+            if (H_avg >= 360.0) H_avg -= 360.0;
+            if (H_min >= 360.0) H_min -= 360.0;
+        }
 
         ranges[i] = (HSVRange){H_min, H_max, H_avg, S_min, S_max, S_avg, V_min, V_max, V_avg};
 
@@ -79,13 +95,13 @@ void color_calibration()
     
     for (int i = 0; i < COLOR_COUNT; i++) {
         // print to file
-        fprintf(fp, "%s: H[%.1f, %.1f, %.1f], S[%.2f, %.2f, %.2f], V[%.2f, %.2f, %.2f]\n",  
-                color_name(i), ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
+        fprintf(fp, "%d: H[%.1f, %.1f, %.1f], S[%.2f, %.2f, %.2f], V[%.2f, %.2f, %.2f]\n",  
+                i, ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
                 ranges[i].S_min, ranges[i].S_max, ranges[i].S_avg, ranges[i].V_min, ranges[i].V_max, ranges[i].V_avg);
-        
-                // print to console
-        printf("%s: H[%.1f, %.1f, %.1f], S[%.2f, %.2f, %.2f], V[%.2f, %.2f, %.2f]\n",
-                color_name(i), ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
+
+        // print to console
+        printf("%d: H[%.1f, %.1f, %.1f], S[%.2f, %.2f, %.2f], V[%.2f, %.2f, %.2f]\n",
+                i, ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
                 ranges[i].S_min, ranges[i].S_max, ranges[i].S_avg, ranges[i].V_min, ranges[i].V_max, ranges[i].V_avg);
     }
 
@@ -210,10 +226,17 @@ void read_color_calibration(HSVRange *ranges)
     char line[200];
     int idx = 0;
     while (fgets(line, sizeof(line), fp)) {
-        sscanf(line, "%*s: H[%lf, %lf, %*lf], S[%lf, %lf, %*lf], V[%lf, %lf, %*lf]",
-               &ranges[idx].H_min, &ranges[idx].H_max,
-               &ranges[idx].S_min, &ranges[idx].S_max,
-               &ranges[idx].V_min, &ranges[idx].V_max);
+        double h_min, h_max, s_min, s_max, v_min, v_max;
+        sscanf(line, "%*d: H[%lf, %lf, %*f], S[%lf, %lf, %*f], V[%lf, %lf, %*f]",
+       &h_min, &h_max, &s_min, &s_max, &v_min, &v_max);
+
+        ranges[idx].H_min = h_min;
+        ranges[idx].H_max = h_max;
+        ranges[idx].S_min = s_min;
+        ranges[idx].S_max = s_max;
+        ranges[idx].V_min = v_min;
+        ranges[idx].V_max = v_max;
+
         idx++;
     }
 
@@ -227,9 +250,12 @@ int classify_color_hsv(int R, int G, int B, int A)
     rgba_to_hsv(R, G, B, A, &H, &S, &V);
 
     // check black and white first
-    if (V < ranges[0].V_max) return 0;
-    if (V > ranges[1].V_min) return 1;
-
+    if (V <= ranges[0].V_max && S <= ranges[0].S_max) {
+        return 0; // black
+    }
+    if (V >= ranges[1].V_min && S <= ranges[1].S_max) {
+        return 1; // white
+    }
     // not black or white, check other colors
     for (int i = 2; i < COLOR_COUNT; i++) {
         if (H >= ranges[i].H_min && H <= ranges[i].H_max &&
@@ -267,7 +293,7 @@ void color_probability(){
             getchar();
 
             int R, G, B, A;
-            if (BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A) != 1)
+            if (BT_read_colour_RGBraw_NXT(PORT_1, &R, &G, &B, &A) != 1)
                 continue;
             int color = classify_color_hsv(R, G, B, A);
             printf("Measured color index: %d\n", color);
@@ -311,16 +337,34 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // connect to robot 
+    char test_msg[8] = {0x06, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x00, 0x01};
+    char reply[1024];
+
+    memset(&reply[0], 0, 1024);
+
+    #ifndef HEXKEY
+    #define HEXKEY "00:16:53:55:D9:FC"  // <--- SET UP YOUR EV3's HEX ID here
+    #endif
+
+    BT_open(HEXKEY);
+
+    // name must not contain spaces or special characters
+    // max name length is 12 characters
+    BT_setEV3name("R2D2");
+
     for (int i = 1; i < argc; i++) {
         int arg = atoi(argv[i]);
 
         if (arg == 0) {
             color_calibration();
         } else if (arg == 1) {
+            read_color_calibration(ranges);
             color_probability();
         } else {
             printf("Unknown argument: %s\n", argv[i]);
         }
     }
+    BT_close();
     return 0;
 }

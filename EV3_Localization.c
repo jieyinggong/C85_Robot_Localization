@@ -405,7 +405,7 @@ int main(int argc, char *argv[])
   *   read your calibration data for use in your localization code. Skip this if you are not using calibration
   * ****************************************************************************************************************/
   read_color_calibration(ranges);
-  read_color_probabilities(color_probabilities);
+  read_color_probability(color_probabilities);
   
  // Your code for reading any calibration information should not go below this line //
  
@@ -490,7 +490,7 @@ int main(int argc, char *argv[])
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
  int robot_x = -1;
- int robot_y = -1
+ int robot_y = -1;
  int direction = 0;
  robot_localization(&robot_x, &robot_y, &direction);
  fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);

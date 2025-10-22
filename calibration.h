@@ -12,7 +12,7 @@
 
 #define EPS 1e-6
 #define COLOR_SAMPLE_COUNT 6
-#define COLOR_READ_COUNT 100
+#define COLOR_READ_COUNT 50
 #define COLOR_COUNT 6
 
 ////////////////////////////////////////
@@ -54,7 +54,7 @@ void rgba_to_hsv(int R, int G, int B, int A, double *H, double *S, double *V);
 // Color determination
 ////////////////////////////////////////
 
-void read_color_calibration(void);
+void read_color_calibration(HSVRange *ranges);
 int classify_color_hsv(int R, int G, int B, int A);
 
 ////////////////////////////////////////
@@ -62,7 +62,7 @@ int classify_color_hsv(int R, int G, int B, int A);
 ////////////////////////////////////////
 
 void color_probability(void);
-void read_color_probability(ColorProbability *color_probabilities)
+void read_color_probability(ColorProbability *color_probabilities); 
 
 
 #endif // CALIBRATION_H
