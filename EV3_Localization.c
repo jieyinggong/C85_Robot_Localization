@@ -96,7 +96,6 @@
 #include <string.h>
 #include "EV3_RobotControl/btcomm.h"
 #include "const.h"
-#include "intersection.h"
 
 // #define DIR_UP    0
 // #define DIR_RIGHT 1
