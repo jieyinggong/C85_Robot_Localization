@@ -547,9 +547,9 @@ int find_street(void)
 //   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
 //   return(0);
 // }
-
-  return(0);
-}
+// 
+//   return(0);
+// }
 
 // int detect_intersection(void)
 // {
