@@ -178,12 +178,12 @@ int color_sim[][4] = {
 
 // ROUTE TO 4 1 AFTER LOCATLIZATION
 int sim_counter_arrived = 0;
-int SIM_COUNT_ARRIVED = 5;
+int SIM_COUNT_ARRIVED = 6;
 int execute_sim_arrived[] = {0, 0, 0, 0, 0, 0};
 int color_sim_arrived[][4] = {
-  // {C_WHITE, C_GREEN, C_WHITE, C_BLUE},
+  {C_WHITE, C_GREEN, C_WHITE, C_BLUE},
   // 
-  {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
+  {C_BLUE, C_WHITE, C_GREEN, C_BLUE},
 
   {C_GREEN, C_WHITE, C_BLUE, C_WHITE},
   {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
@@ -529,11 +529,13 @@ int main(int argc, char *argv[])
   free(map_image);
   exit(1);
  }
+
+ printf("Going to target (%d, %d)\n", dest_x, dest_y);
  success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
  while (!success) {
     // re-localize
-    success = robot_localization(&robot_x, &robot_y, &direction);
-    fprintf(stderr, "Re-localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
+    // success = robot_localization(&robot_x, &robot_y, &direction);
+    // fprintf(stderr, "Re-localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
     success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
  }
  fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
@@ -836,7 +838,7 @@ void execute_move_sim_arrived(int *hit_count)
 {
   // This is a simulated version of execute_move for testing purposes only
   *hit_count = execute_sim_arrived[sim_counter_arrived++];
-  printf("Simulated hit count, hit_count=%d\n", *hit_count);
+  printf("Simulated hit count, hit_count=%d, sim_counter_arrived=%d\n", *hit_count, sim_counter_arrived);
 
   return; 
 }
@@ -853,6 +855,9 @@ void scan_intersection_sim_arrived(int *tl, int *tr, int *br, int *bl)
   *bl = color_sim[sim_counter_arrived][3];
   printf("Simulated scan_intersection arrived: tl=%d, tr=%d, br=%d, bl=%d\n", *tl, *tr, *br, *bl);
   return; 
+ } else {
+  printf("Simulated scan_intersection arrived: out of range\n");
+  exit(0);
  }
  return; 
 }
@@ -910,6 +915,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   while (steps++ < MAX_STEPS) {
     // 0) 如果已经到达目标，就做一次确认扫描（可选），然后成功返回
     if (cur_x == target_x && cur_y == target_y) {
+      printf("Arrived at target (%d, %d), confirming position with final scan\n", target_x, target_y);
       // 可选：最后再扫一次增强鲁棒
       int tl,tr,br,bl;
       scan_intersection_sim_arrived(&tl,&tr,&br,&bl); 
@@ -919,6 +925,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
       // 再检查一次在线置信度（允许用更低阈值）
       int bi, bd; double bv;
       current_argmax(&bi,&bd,&bv);
+      //exit(1); 
       if (bv >= nav_thresh) return 1;   // 成功到达且定位仍然可信
       else return 0;                    // 位置不稳，建议外层重新定位
     }
@@ -937,7 +944,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
     cur_dir = bd;
 
     // 在线置信度太低 → 交回上层做 relocalize
-    if (bv < nav_thresh) return 0;
+    // if (bv < nav_thresh) return 0;
 
     // 2) 决定下一步朝哪走（简单曼哈顿：先 X 后 Y）
     // printf("step 2\n");
@@ -970,7 +977,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
 
     // 4) 沿当前方向行驶到下一路口（execute_move 内部保证到下一个路口停下）
     int hit_count = 0;
-    // execute_move_sim_arrived(&hit_count);
+    execute_move_sim_arrived(&hit_count);
 
     // 5) Motion update：将所有朝向的假设各自前进一步
     actionModel();
@@ -989,26 +996,19 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
     }
 
     // 7) 到达新路口后再测一次（更稳）
-    {
-      int tl,tr,br,bl;
-      scan_intersection_sim_arrived(&tl,&tr,&br,&bl);
-      int z[4] = {tl,tr,br,bl};
-      updateBelief(z);
-    }
+    scan_intersection_sim_arrived(&tl,&tr,&br,&bl);
+    updateBelief(z);
 
     // 8) 更新一次当前估计并检查在线置信度
-    {
-      int bi, bd; double bv;
-      current_argmax(&bi,&bd,&bv);
-      cur_x = bi % sx;
-      cur_y = bi / sx;
-      cur_dir = bd;
+    current_argmax(&bi,&bd,&bv);
+    cur_x = bi % sx;
+    cur_y = bi / sx;
+    cur_dir = bd;
 
-      if (bv < nav_thresh) {
-        // 定位开始变差，交回上层触发重定位（或在此处也可写一小段“原地旋转再扫描”的自救）
-        return 0;
-      }
-    }
+    // if (bv < nav_thresh) {
+    //   // 定位开始变差，交回上层触发重定位（或在此处也可写一小段“原地旋转再扫描”的自救）
+    //   return 0;
+    // }
   }
 
   // 超过最大步数，认为失败
