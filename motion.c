@@ -1,8 +1,8 @@
 #include "./EV3_RobotControl/btcomm.h"
 #include "motion.h"
-#include <unistd.h>  // Required for usleep
+#include <unistd.h>
 #include <stdbool.h>
-#include <math.h>   // Required for fmod
+#include <math.h>
 #include "const.h"
 
 #define DEG_STEP   15.0      
@@ -10,7 +10,6 @@
 #define N_SAMPLES  24   
 
 void recorrect_to_black_internal(int depth);
-// void micro_swing_correction(int rotate_power);
 int find_alternate_street(void);
 
 #define HISTORY_SIZE 6       
@@ -733,9 +732,9 @@ void verify_and_recorrect_internal(int depth)
         else
         {
             printf("[Verify] Max recursion depth reached, stopping further correction.\n");
-            if (find_alternate_street()) {
-                recorrect_to_black(1);
-            }    
+            // if (find_alternate_street()) {
+            //     recorrect_to_black();
+            // }    
         }
     }
     else
