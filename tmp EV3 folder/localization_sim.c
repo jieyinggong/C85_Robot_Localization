@@ -529,11 +529,6 @@ int main(int argc, char *argv[])
  exit(0);
 }
 
-int find_street(void)   
-{
-  return 0;
-}
-
 // int drive_along_street(void)
 // {
 //  /*

@@ -171,7 +171,11 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
 // MINTY!!!
 static void execute_move(int *hit_count) {
   int border_flag = 0;
-
+  BT_timed_motor_port_start(LEFT_MOTOR, 8, 100, 1500, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+  BT_timed_motor_port_start(RIGHT_MOTOR, 7, 120, 1500, 100); // Start motor C with power 6, ramp up time 500ms
+   // BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
+//fprintf(stderr, "Drive forward to start point of scan.\n");
+    sleep(3);
   while (*hit_count < 2) {
     int res = drive_along_street(1, &border_flag);
     if (res == 1 && border_flag == 0) {
@@ -204,7 +208,7 @@ static inline void expected_corners_for_dir(int idx, int dir, int out4[4]){
 // 从 color_probabilities[] 取命中率；若未加载或异常，给一个保守默认值
 static inline double get_color_hit_prob(int c){
   // 仅对 WHITE/GREEN/BLUE 用到（交叉口），其余颜色用不到也返回个默认
-  if (c < 0 || c > 5) return 0.85;
+  if (c < 1 || c > 6) return 0.85;
   double p = color_probabilities[c].probability;
   // 稍作夹取，避免 0 或 1 导致数值问题
   if (p < 0.55) p = 0.55;
@@ -307,14 +311,19 @@ void actionModel()
   // update beliefs
   int dx[4] = {0, 1, 0, -1};
   int dy[4] = {-1, 0, 1, 0};
-  static double newBeliefs[400][4] = {0.001}; // 初始化为小值，避免全0
+  double newBeliefs[15][4];
+  for (int idx = 0; idx < sx * sy; idx++) {
+    for (int d = 0; d < 4; d++) {
+      newBeliefs[idx][d] = FLOOR_EPS;   // 小而非零
+    }
+  }
   for (int idx = 0; idx < sx * sy; idx++) {
     for (int dir = 0; dir < 4; dir++) {
       int newX = idx_to_x(idx) + dx[dir];
       int newY = idx_to_y(idx) + dy[dir];
       if (newX >= 0 && newX < sx && newY >= 0 && newY < sy) {
         int newIdx = xy_to_idx(newX, newY);
-        newBeliefs[newIdx][dir] = beliefs[idx][dir];
+        newBeliefs[newIdx][dir] += beliefs[idx][dir];
       }
     }
   }
@@ -348,7 +357,7 @@ int main(int argc, char *argv[])
  
  if (argc<4)
  {
-  fprintf(stderr,"Usage: EV3_Localization map_name dest_x dest_y\n");
+  fprintf(stderr,"Usage: ev3_robot Map1.ppm dest_x dest_y\n");
   fprintf(stderr,"    map_name - should correspond to a properly formatted .ppm map image\n");
   fprintf(stderr,"    dest_x, dest_y - target location for the bot within the map, -1 -1 calls calibration routine\n");
   exit(1);
@@ -452,73 +461,48 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
-  // printf("Turn left 90 degrees\n"); 
-  // turn_left_90_degrees();
-
-  // printf("Turn right 90 degrees\n"); 
-  // turn_right_90_degrees();
-// 
-  printf("Turn back 180 degrees\n");
-  turn_back_180_degrees();
-
- // ============= motion control test =============
-
-  // init find intersection test
-  //  find_street(1);
-  //  int rotate_power = 10;
-  //  BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 150*rotate_power, 80);
-  //  BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 150*rotate_power, 100);
-  //  recorrect_to_black();
-  // sleep(2);
-  // BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 800, 80);
-  // BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 800, 100);
-  // sleep(2);
-  // recorrect_to_black(8, 1);
-  // sleep(2);
-  int border_flag = 0;
-  int res = drive_along_street(1, &border_flag);
-  fprintf(stderr, "drive along street result: %d\n", res);
-
-  // sleep(2);
-
-  // turn right 90 degrees test
-  // turn_right_90_degrees();
-  // sleep(1);
-  // turn_right_90_degrees();
-  // sleep(1);
-
- // micro_swing_correction(8);
-
-//  turn_left_90_degrees();
-//  turn_left_90_degrees();
- // turn_back_180_degrees();
-  sleep(1);
-
-  BT_close();
-  free(map_image);
-  exit(0);
-
- // ============= motion control test  =============
  
  int robot_x = -1;
  int robot_y = -1;
  int direction = 0;
  robot_localization(&robot_x, &robot_y, &direction);
  fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
- int success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
- while (!success) {
+ int success = robot_localization(&robot_x, &robot_y, &direction);
+ if (success) {
+  fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
+  // print current all beliefs
+  for (int j=0; j<sy; j++) {
+    for (int i=0; i<sx; i++) {
+      int idx = i + (j * sx);
+      fprintf(stderr, "B[%2d,%2d] = [%.4f, %.4f, %.4f, %.4f]\n", i, j,
+        beliefs[idx][0], beliefs[idx][1], beliefs[idx][2], beliefs[idx][3]);
+    }
+  }
+  BT_close();
+  free(map_image);
+  exit(0);
+  } else {
+   fprintf(stderr, "Localization failed! Robot could not determine its location.\n");
+   BT_close();
+   free(map_image);
+   exit(1);
+  }
+
+  // TODO
+  success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
+  while (!success) {
     // re-localize
-    robot_localization(&robot_x, &robot_y, &direction);
+    success = robot_localization(&robot_x, &robot_y, &direction);
     fprintf(stderr, "Re-localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
     success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
- }
- fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
- // TODO: robot can do something cool to show mission complete! like dance (keep 360% crazy rotating & playing a song)
+  }
+  fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
+  // TODO: robot can do something cool to show mission complete! like dance (keep 360% crazy rotating & playing a song)
 
- // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
- BT_close();
- free(map_image);
- exit(0);
+  // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
+  BT_close();
+  free(map_image);
+  exit(0);
 }
 
 // int find_street(void)   
@@ -719,7 +703,7 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
   sleep(2);
   recorrect_to_black();
   int border_flag = 0;
-  drive_along_street(1, border_flag);
+  drive_along_street(1, &border_flag);
   sleep(1);
   // Minty* - you need to consider case that hit intersection
 
@@ -948,7 +932,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
-   color_calibration();
+  // color_calibration();
   // 
   // printf("Calibration complete, now measuring colour probabilities...\n");
   // getchar();

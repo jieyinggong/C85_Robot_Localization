@@ -13,12 +13,13 @@ void recorrect_to_black_internal(int depth);
 // void micro_swing_correction(int rotate_power);
 int find_alternate_street(void);
 
-#define HISTORY_SIZE 5  
-#define MIN_VOTE     3
+#define HISTORY_SIZE 6       
+#define MIN_VOTE 3           
+#define MIN_STABLE 3         
 
 int detect_intersection(void)
 {
-    static int color_history[HISTORY_SIZE] = { C_BLACK }; // 初始化为黑
+    static int color_history[HISTORY_SIZE] = { C_BLACK }; 
     static int idx = 0;
 
     int R, G, B, A, color = C_BLACK;
@@ -32,6 +33,7 @@ int detect_intersection(void)
     color_history[idx] = color;
     idx = (idx + 1) % HISTORY_SIZE;
 
+    //majority vote
     int count_black = 0, count_yellow = 0, count_red = 0, count_other = 0;
     for (int i = 0; i < HISTORY_SIZE; i++) {
         switch (color_history[i]) {
@@ -42,19 +44,28 @@ int detect_intersection(void)
         }
     }
 
-    if (count_yellow >= MIN_VOTE) {
-        fprintf(stderr, "[detect] Intersection confirmed (YELLOW, %d/%d)\n", count_yellow, HISTORY_SIZE);
-        return 1;
-    } else if (count_red >= MIN_VOTE) {
-        fprintf(stderr, "[detect] Border confirmed (RED, %d/%d)\n", count_red, HISTORY_SIZE);
-        return 2;
-    } else if (count_black >= MIN_VOTE) {
-        // fprintf(stderr, "[detect] On street (BLACK)\n");
-        return 0;
-    } else {
-        fprintf(stderr, "[detect] Unstable color — treating as deviation.\n");
-        return 3;
-    }
+    int current_result = 3; 
+    if (count_yellow >= MIN_VOTE) current_result = 1;
+    else if (count_red >= MIN_VOTE) current_result = 2;
+    else if (count_black >= MIN_VOTE) current_result = 0;
+
+    // check stable
+    // if (current_result == last_result)
+    //     stable_count++;
+    // else
+    //     stable_count = 1;
+
+    // if (stable_count >= MIN_STABLE && current_result != last_result) {
+    //     fprintf(stderr,
+    //         "[detect] Stable transition %d → %d (Y=%d, R=%d, B=%d)\n",
+    //         last_result, current_result, count_yellow, count_red, count_black);
+    //     last_result = current_result;
+    //     stable_count = 0;
+    // }
+    // return last_result;
+
+    return current_result;
+
 }
 
 int detect_intersection_or_street(void){
@@ -112,8 +123,8 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
     sleep(1); // Wait a moment for the gyro to stabilize
     // drive forwarde to the start point of scan
-    BT_timed_motor_port_start(LEFT_MOTOR, 7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 120, 1380, 100); // Start motor C with power 6, ramp up time 500ms
+    BT_timed_motor_port_start(LEFT_MOTOR, 8, 100, 1500, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+    BT_timed_motor_port_start(RIGHT_MOTOR, 7, 120, 1500, 100); // Start motor C with power 6, ramp up time 500ms
    // BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
     fprintf(stderr, "Drive forward to start point of scan.\n");
     sleep(3); // Wait for the bot to reach the start point
@@ -375,7 +386,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     total_votes += color_vote[region][color];
                 }
 
-                if (region_color[region] == C_OTHER || (unknown_votes / total_votes > 0.5)) {
+                if (region_color[region] == C_UNKNOWN || (unknown_votes / total_votes > 0.5)) {
                     fprintf(stderr, "Region %d has unknown color or over 50%% unknown votes. Performing specified check...\n", region);
 
                     // Calculate average angle for unknown color in this region
@@ -441,7 +452,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
                     // Recalculate the final color for this region
                     double max_votes = 0;
-                    int best_color = C_OTHER; // Default to UNKNOWN
+                    int best_color = C_UNKNOWN; // Default to UNKNOWN
                     for (int color = 0; color < 7; ++color) {
                         if ((color == C_BLUE || color == C_GREEN || color == C_WHITE) && color_vote[region][color] > max_votes) {
                             max_votes = color_vote[region][color];
@@ -489,6 +500,8 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
     *(tr)=region_color[0];
     *(br)=region_color[1];
     *(bl)=region_color[2];
+
+
 
     return 1; // success
  
@@ -590,6 +603,50 @@ int drive_along_street(int dir, int* border_flag)
     }
 
     BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    //   // Double-check: small back, return, small forward, return.
+    //   int R = 0, G = 0, B = 0, A = 0;
+    //   int c_back = -1, c_forward = -1;
+
+    //   // Step back a little
+    //   BT_timed_motor_port_start(LEFT_MOTOR, -8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, -7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    //   BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+    //   c_back = classify_color_hsv(R, G, B, A);
+
+    //   // Return to original position
+    //   BT_timed_motor_port_start(LEFT_MOTOR, 8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, 7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+    //   // Step forward a little
+    //   BT_timed_motor_port_start(LEFT_MOTOR, 8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, 7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    //   BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+    //   c_forward = classify_color_hsv(R, G, B, A);
+
+    //   // Return to original position again
+    //   BT_timed_motor_port_start(LEFT_MOTOR, -8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, -7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+    //   fprintf(stderr, "Double-check: back=%d forward=%d\n", c_back, c_forward);
+
+    //   // If both checks indicate street (treat YELLOW as street too), resume as if on black
+    //   if ((c_back == C_BLACK || c_back == C_YELLOW || c_back == C_RED) &&
+    //       (c_forward == C_BLACK || c_forward == C_YELLOW || c_forward == C_RED)) {
+    //       fprintf(stderr, "Double-check confirms street — resuming drive.\n");
+    //       if (!started) {
+    //           started = 1;
+    //           BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 6, dir * 5);
+    //       }
+    //       continue;
+    //   }
 
     if (detected == 1) {
       fprintf(stderr, "Intersection detected. Stopping.\n");
@@ -734,7 +791,7 @@ void recorrect_to_black_internal(int depth)
         BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
 
         // Forward (angle compensation)
-        BT_read_gyro(G, 0, &angle, &rate);
+        BT_read_gyro(GYRO_PORT, 0, &angle, &rate);
         double theta_f = fabs(angle);
         if (theta_f > 180) theta_f = 360 - theta_f;  // wrap to [0,180]
         double theta_rad_f = theta_f * M_PI / 180.0;
@@ -810,7 +867,7 @@ int find_street(int dir)
         // }
 
         // Keep moving forward in small steps
-        BT_drive(LEFT_MOTOR, RIGHT_MOTOR, 0, dir * 10);
+        BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 10, 0);
         sleep(1);
         BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
     }
@@ -840,7 +897,7 @@ void micro_swing_correction(int rotate_power)
     int R = 0, G = 0, B = 0, A = 0;
     int color = -1;
     int angle = 0, rate = 0;
-    const int MAX_SWING = 3;       
+    const int MAX_SWING = 4;       
     const int STEP_TIME = 500;     
 
     printf("[MicroCorrection] Starting small fan-sweep correction...\n");
@@ -852,7 +909,7 @@ void micro_swing_correction(int rotate_power)
 
     while (swing_count < MAX_SWING * 2)
     {   
-        int time = (int)(STEP_TIME * (1.0 + 0.8 * swing_count));
+        int time = (int)(STEP_TIME * (1.0 + 0.6 * swing_count));
 
         if (dir == 1){
             BT_timed_motor_port_start(RIGHT_MOTOR, 10, 100, time, 100);
@@ -868,7 +925,17 @@ void micro_swing_correction(int rotate_power)
         color = classify_color_hsv(R, G, B, A);
         printf("[MicroCorrection] Swing #%d dir=%d color=%d with time %d\n", swing_count, dir, color, time);
 
-        if (dir == 1){
+        if (color == C_BLACK || color == C_YELLOW)
+        {
+            printf("[MicroCorrection] Street line reacquired — stopping.\n");
+                BT_drive(LEFT_MOTOR, RIGHT_MOTOR, 8, 7);
+                sleep(1);
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
+            BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+            break;
+        }
+
+         if (dir == 1){
             BT_timed_motor_port_start(RIGHT_MOTOR,  -10, 100, time * 0.9, 100);
              BT_timed_motor_port_start(LEFT_MOTOR,  7, 100, time * 0.9, 100);
             
@@ -879,15 +946,6 @@ void micro_swing_correction(int rotate_power)
         }
         usleep(1010*(time+500));
         
-        if (color == C_BLACK || color == C_YELLOW)
-        {
-            printf("[MicroCorrection] Street line reacquired — stopping.\n");
-                BT_drive(LEFT_MOTOR, RIGHT_MOTOR, 6, 5);
-                sleep(1);
-                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
-            BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
-            break;
-        }
 
         dir = -dir;
         swing_count++;
