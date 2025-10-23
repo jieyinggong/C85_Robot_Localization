@@ -196,10 +196,18 @@ static int build_feasible_directions(int outDirs[4]){
 }
 
 // execute the chosen move: turn to absolute dir, leave the intersection, and follow street to next one
-static void execute_move(int absDir){
-  turn_at_intersection(absDir);  // your helper aligns & points to desired absolute direction
-  sleep(3);
-  drive_along_street();          // cross intersection + follow the black line to the next intersection
+static int execute_move(int absDir, int *hit_count){
+  // if get 
+  int pos = drive_along_street();
+  if (pos == 2){
+      fprintf(stderr, "Detected border during drive along street. Stopping execution of move.\n");
+      // add back to previous intersection
+      turn_at_intersection(DIR_RIGHT); // turn right
+      // drive to next intersection
+      *hit_count ++;
+      return 2; // hit border
+  }
+  return 0; // success
 }
 
 // 将地图四角(TL,TR,BR,BL)按朝向 dir 顺时针旋转 dir 步，得到“机器人视角下应看到的顺序”
