@@ -353,7 +353,7 @@ int main(int argc, char *argv[])
  
  if (argc<4)
  {
-  fprintf(stderr,"Usage: EV3_Localization map_name dest_x dest_y\n");
+  fprintf(stderr,"Usage: ev3_robot Map1.ppm dest_x dest_y\n");
   fprintf(stderr,"    map_name - should correspond to a properly formatted .ppm map image\n");
   fprintf(stderr,"    dest_x, dest_y - target location for the bot within the map, -1 -1 calls calibration routine\n");
   exit(1);
@@ -381,8 +381,8 @@ int main(int argc, char *argv[])
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
   *   read your calibration data for use in your localization code. Skip this if you are not using calibration
   * ****************************************************************************************************************/
-  read_color_calibration(ranges);
-  read_color_probability(color_probabilities);
+  // read_color_calibration(ranges);
+  // read_color_probability(color_probabilities);
   
  // Your code for reading any calibration information should not go below this line //
  
@@ -457,53 +457,6 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
-  // printf("Turn left 90 degrees\n"); 
-  // turn_left_90_degrees();
-
-  // printf("Turn right 90 degrees\n"); 
-  // turn_right_90_degrees();
-// 
-  printf("Turn back 180 degrees\n");
-  turn_back_180_degrees();
-
- // ============= motion control test =============
-
-  // init find intersection test
-  //  find_street(1);
-  //  int rotate_power = 10;
-  //  BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 150*rotate_power, 80);
-  //  BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 150*rotate_power, 100);
-  //  recorrect_to_black();
-  // sleep(2);
-  // BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 800, 80);
-  // BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 800, 100);
-  // sleep(2);
-  // recorrect_to_black(8, 1);
-  // sleep(2);
-  int border_flag = 0;
-  int res = drive_along_street(1, &border_flag);
-  fprintf(stderr, "drive along street result: %d\n", res);
-
-  // sleep(2);
-
-  // turn right 90 degrees test
-  // turn_right_90_degrees();
-  // sleep(1);
-  // turn_right_90_degrees();
-  // sleep(1);
-
- // micro_swing_correction(8);
-
-//  turn_left_90_degrees();
-//  turn_left_90_degrees();
- // turn_back_180_degrees();
-  sleep(1);
-
-  BT_close();
-  free(map_image);
-  exit(0);
-
- // ============= motion control test  =============
  
  int robot_x = -1;
  int robot_y = -1;
@@ -521,13 +474,17 @@ int main(int argc, char *argv[])
         beliefs[idx][0], beliefs[idx][1], beliefs[idx][2], beliefs[idx][3]);
     }
   }
+  BT_close();
   free(map_image);
   exit(0);
   } else {
    fprintf(stderr, "Localization failed! Robot could not determine its location.\n");
+   BT_close();
    free(map_image);
    exit(1);
   }
+
+  // TODO
   success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
   while (!success) {
     // re-localize
