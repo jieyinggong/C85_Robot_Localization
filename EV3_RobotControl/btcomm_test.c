@@ -58,7 +58,12 @@ int main(int argc, char *argv[]) {
 
   // name must not contain spaces or special characters
   // max name length is 12 characters
-  BT_setEV3name("R2D2");
+  //BT_setEV3name("R2D2");
+
+  // Calibration of color sensor
+  // color_calibration();
+
+  read_color_calibration();
 
   BT_play_tone_sequence(tone_data);
 
@@ -113,11 +118,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to read gyro sensor.\n");
         break;
       }
-      fprintf(stderr, "Current angle: %d\n", angle);
+    //  fprintf(stderr, "Current angle: %d\n", angle);
     }
 
     // Stop the motors
-    BT_motor_port_stop(MOTOR_A | MOTOR_C, 1);  // Stop with active brake
+    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop with active brake
   }
 
   BT_close();
