@@ -168,32 +168,6 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
   }
 }
 
-// compute which absolute move directions are *globally feasible* given current belief mass:
-// a direction is feasible if moving that way doesn't exit the grid for a non-trivial portion of belief.
-static int build_feasible_directions(int outDirs[4]){
-  double mass[4] = {0,0,0,0};
-  for(int i=0;i<sx*sy;i++){
-    // total mass at intersection i across all headings
-    double mi = beliefs[i][0]+beliefs[i][1]+beliefs[i][2]+beliefs[i][3];
-    if (mi < MASS_EPS) continue;
-    int x = idx_to_x(i), y = idx_to_y(i);
-    if (y > 0)          mass[DIR_UP]    += mi; // can move up
-    if (x < sx-1)       mass[DIR_RIGHT] += mi; // can move right
-    if (y < sy-1)       mass[DIR_DOWN]  += mi; // can move down
-    if (x > 0)          mass[DIR_LEFT]  += mi; // can move left
-  }
-  int n=0;
-  for(int d=0; d<4; d++){
-    if (mass[d] > MASS_EPS) outDirs[n++] = d;
-  }
-  // Fallback: if somehow empty, allow all 4 (should rarely happen)
-  if (n == 0){
-    outDirs[0]=DIR_UP; outDirs[1]=DIR_RIGHT; outDirs[2]=DIR_DOWN; outDirs[3]=DIR_LEFT;
-    n = 4;
-  }
-  return n;
-}
-
 // MINTY!!!
 static void execute_move(int *hit_count){
   drive_along_street();
@@ -293,8 +267,6 @@ static inline double sensor_likelihood_4(const int readings[4], const int expect
 // ==============================================================================================
 //
 // 参数：
-//   moveDir   - 上一次或下一次运动方向（如果你的测量模型需要用到“将要去的方向”，可以使用；
-//               若不用，可忽略）
 //   readings  - 当前路口观测到的四角颜色，顺序 [tl, tr, br, bl]
 //
 // 逻辑：
@@ -303,10 +275,8 @@ static inline double sensor_likelihood_4(const int readings[4], const int expect
 //     2) 计算 P(z|s) 并做 Bel[s] *= P(z|s)
 //   然后全局归一化
 //
-void updateBelief(int moveDir, int readings[4])
+void updateBelief(int readings[4])
 {
-  (void)moveDir; // 当前实现未使用，如需将来引入“朝向偏好”可利用该参数
-
   // 一次性把所有状态都按观测更新
   for(int idx=0; idx < sx*sy; idx++){
     for(int dir=0; dir<4; dir++){
@@ -683,7 +653,6 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
   srand((unsigned int)time(NULL));
 
   int scans = 0;
-  int lastMoveDir = DIR_UP; // arbitrary init; only used by updateBelief if your design needs it
 
   while (1)
   {
@@ -694,7 +663,7 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
     int z[4] = {tl,tr,br,bl};
     // Minty*
 
-    updateBelief(lastMoveDir, z);   // Bayesian sensor update with your internal likelihood model
+    updateBelief(z);   // Bayesian sensor update with your internal likelihood model
     scans++;
 
     // 2) Check convergence
@@ -740,52 +709,6 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
  return 1;
 }
 
-static int localization_still_ok(void){
-  int bi, bd; double bv;
-  current_argmax(&bi,&bd,&bv);
-  return (bv >= NAV_CERTAINTY_THRESHOLD);
-}
-
-static int perform_step_and_check(int moveDir, int *pCurX, int *pCurY, int *pCurDir, int *pStepCounter)
-{
-  // Execute physical movement
-  execute_move(moveDir);
-
-  // Motion (mathematical) update
-  actionModel(moveDir);
-
-  (*pStepCounter)++;
-
-  // Possibly scan at this intersection according to NAV_SCAN_EVERY_STEPS
-  if ((*pStepCounter) % NAV_SCAN_EVERY_STEPS == 0){
-    int tl,tr,br,bl;
-    if (scan_intersection(&tl,&tr,&br,&bl)){
-      int z[4] = {tl,tr,br,bl};
-      updateBelief(moveDir, z);
-    } else {
-      // If scan failed, be conservative but continue; still check localization
-      int dummy_tl=-1,dummy_tr=-1,dummy_br=-1,dummy_bl=-1;
-      int z[4] = {dummy_tl,dummy_tr,dummy_br,dummy_bl};
-      updateBelief(moveDir, z);
-    }
-
-    if (!localization_still_ok()){
-      return 0; // LOST
-    }
-  }
-
-  // Update current best estimate from beliefs
-  {
-    int bi, bd; double bv;
-    current_argmax(&bi,&bd,&bv);
-    *pCurX = idx_to_x(bi);
-    *pCurY = idx_to_y(bi);
-    *pCurDir = bd;
-  }
-
-  return 1;
-}
-
 int go_to_target(int robot_x, int robot_y, int direction, int target_x, int target_y)
 {
  /*
@@ -808,39 +731,9 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   TO DO  -   Complete this function
    ***********************************************************************************************************************/
-  // 进入街道（以防起始时没在黑线上）
-  find_street();
-
-  // 这里用简单的曼哈顿路径：先水平，再垂直（你可以换成A*或别的策略）
-  int cur_x = robot_x;
-  int cur_y = robot_y;
-  int cur_dir = direction;
-
-  int stepCounter = 0;
-
-  // 1) 先走 X 方向
-  while (cur_x != target_x){
-    int moveDir = (target_x > cur_x) ? DIR_RIGHT : DIR_LEFT;
-    if (!perform_step_and_check(moveDir, &cur_x, &cur_y, &cur_dir, &stepCounter)) return 0;  // LOST → 让 main 触发重定位
-  }
-
-  // 2) 再走 Y 方向
-  while (cur_y != target_y){
-    int moveDir = (target_y > cur_y) ? DIR_DOWN : DIR_UP;
-    if (!perform_step_and_check(moveDir, &cur_x, &cur_y, &cur_dir, &stepCounter)) return 0;  // LOST → 让 main 触发重定位
-  }
- 
-  // 到达目标格后再做一次确认扫描（可选，增强鲁棒性）
-  {
-    int tl,tr,br,bl; scan_intersection(&tl,&tr,&br,&bl);
-    int z[4] = {tl,tr,br,bl};
-    updateBelief(cur_dir, z);
-    if (!localization_still_ok()){
-      return 0; // 目标附近定位不稳，也让 main 走重定位流程
-    }
-  }
-
-  return 1; // 成功到达
+  
+   // localize along the way to target
+   return 1;
  }
  
  void calibrate_sensor(void)

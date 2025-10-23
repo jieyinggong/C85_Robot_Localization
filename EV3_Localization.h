@@ -75,8 +75,9 @@ code that you have to complete in order to implement the localization algorithms
 #endif
 
 // helper functions
-void updateBelief(int moveDir, int readings[4]);
-void actionModel(int moveDir);
+void updateBelief(int readings[4]);
+void actionModel();
+void rotateBeliefsRight();
 
 int parse_map(unsigned char *map_img, int rx, int ry);
 int robot_localization(int *robot_x, int *robot_y, int *direction);
