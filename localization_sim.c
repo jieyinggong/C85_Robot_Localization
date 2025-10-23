@@ -96,6 +96,7 @@
 #include <string.h>
 #include "EV3_RobotControl/btcomm.h"
 #include "const.h"
+#include "btcomm.h"
 
 // #define DIR_UP    0
 // #define DIR_RIGHT 1
@@ -387,6 +388,34 @@ void rotateBeliefsRight()
   memcpy(beliefs, newBeliefs, sizeof(newBeliefs));
 }
 
+void celebration_spin_and_sing()
+{
+  int melody[50][3];
+  for (int i=0; i<50; i++) {
+    melody[i][0] = -1;
+    melody[i][1] = -1;
+    melody[i][2] = -1;
+  }
+
+  melody[0][0] = 262; melody[0][1] = 500; melody[0][2] = 10;
+  melody[1][0] = 294; melody[1][1] = 500; melody[1][2] = 10;
+  melody[2][0] = 330; melody[2][1] = 500; melody[2][2] = 10;
+  melody[3][0] = 349; melody[3][1] = 500; melody[3][2] = 10;
+  melody[4][0] = 392; melody[4][1] = 500; melody[4][2] = 10;
+  melody[5][0] = 440; melody[5][1] = 500; melody[5][2] = 10;
+  melody[6][0] = 494; melody[6][1] = 500; melody[6][2] = 10;
+  melody[7][0] = 523; melody[7][1] = 500; melody[7][2] = 10;
+  melody[8][0] = 554; melody[8][1] = 500; melody[8][2] = 10;
+  melody[9][0] = 587; melody[9][1] = 500; melody[9][2] = 10;
+  melody[10][0] = 622; melody[10][1] = 500; melody[10][2] = 10;
+  melody[11][0] = 659; melody[11][1] = 500; melody[11][2] = 10;
+  melody[12][0] = 698; melody[12][1] = 500; melody[12][2] = 10;
+
+  BT_turn(LEFT_MOTOR, 30, RIGHT_MOTOR, -30);
+  BT_play_tone_sequence(melody);
+  BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+}
+
 int main(int argc, char *argv[])
 {
  char mapname[1024];
@@ -409,19 +438,19 @@ int main(int argc, char *argv[])
  dest_y=atoi(argv[3]);
 
 // Open a socket to the EV3 for remote controlling the bot.
-  // if (BT_open(HEXKEY)!=0)
-  // {
-  //   fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
-  //   fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
-  //   free(map_image);
-  //   exit(1);
-  // }
+  if (BT_open(HEXKEY)!=0)
+  {
+    fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
+    fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
+    free(map_image);
+    exit(1);
+  }
 // 
-  // if (dest_x==-1&&dest_y==-1)
-  // {
-  //   calibrate_sensor();
-  //   exit(1);
-  // }
+  if (dest_x==-1&&dest_y==-1)
+  {
+    calibrate_sensor();
+    exit(1);
+  }
 
  /******************************************************************************************************************
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
@@ -539,7 +568,9 @@ int main(int argc, char *argv[])
     success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
  }
  fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
+
  // TODO: robot can do something cool to show mission complete! like dance (keep 360% crazy rotating & playing a song)
+ celebration_spin_and_sing();
 
  // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
  // BT_close();
