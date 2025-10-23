@@ -9,6 +9,8 @@
 #define WINDOW     5.0     
 #define N_SAMPLES  24   
 
+void recorrect_to_black_internal(int depth);
+
 int detect_intersection(void)
 {
  /*
