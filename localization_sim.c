@@ -134,6 +134,7 @@ ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold co
 void scan_intersection_sim(int *tl, int *tr, int *br, int *bl);
 void scan_intersection_sim_arrived(int *tl, int *tr, int *br, int *bl);
 void execute_move_sim(int *hit_count);
+void execute_move_sim_arrived(int *hit_count);
 int sim_counter = 0;
 int SIM_COUNT = 13;
 
@@ -175,26 +176,18 @@ int color_sim[][4] = {
 
 };
 
+// ROUTE TO 4 1 AFTER LOCATLIZATION
 int sim_counter_arrived = 0;
-int SIM_COUNT_ARRIVED = 13;
-int execute_sim_arrived[] = {2, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1};
+int SIM_COUNT_ARRIVED = 5;
+int execute_sim_arrived[] = {0, 0, 0, 0, 0, 0};
 int color_sim_arrived[][4] = {
   // {C_WHITE, C_GREEN, C_WHITE, C_BLUE},
   // 
-  // {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
-  // {C_WHITE, C_GREEN, C_WHITE, C_BLUE}, 
-
-  {C_BLUE, C_BLUE, C_WHITE, C_GREEN}, 
-  {C_GREEN, C_WHITE, C_GREEN, C_BLUE},
   {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
-  {C_BLUE, C_BLUE, C_WHITE, C_GREEN},
-
-  {C_WHITE, C_BLUE, C_WHITE, C_GREEN}, 
-  {C_BLUE, C_BLUE, C_WHITE, C_GREEN}, 
 
   {C_GREEN, C_WHITE, C_BLUE, C_WHITE},
-  {C_GREEN, C_BLUE, C_GREEN, C_WHITE},
-  {C_BLUE, C_WHITE, C_GREEN, C_WHITE},
+  {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
+  {C_GREEN, C_WHITE, C_GREEN, C_BLUE}, 
   {C_GREEN, C_WHITE, C_BLUE, C_WHITE}
 
 };
@@ -416,19 +409,19 @@ int main(int argc, char *argv[])
  dest_y=atoi(argv[3]);
 
 // Open a socket to the EV3 for remote controlling the bot.
-  if (BT_open(HEXKEY)!=0)
-  {
-    fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
-    fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
-    free(map_image);
-    exit(1);
-  }
-
-  if (dest_x==-1&&dest_y==-1)
-  {
-    calibrate_sensor();
-    exit(1);
-  }
+  // if (BT_open(HEXKEY)!=0)
+  // {
+  //   fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
+  //   fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
+  //   free(map_image);
+  //   exit(1);
+  // }
+// 
+  // if (dest_x==-1&&dest_y==-1)
+  // {
+  //   calibrate_sensor();
+  //   exit(1);
+  // }
 
  /******************************************************************************************************************
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
@@ -531,8 +524,6 @@ int main(int argc, char *argv[])
         beliefs[idx][0], beliefs[idx][1], beliefs[idx][2], beliefs[idx][3]);
     }
   }
-  free(map_image);
-  exit(0);
  } else {
   fprintf(stderr, "Localization failed! Robot could not determine its location.\n");
   free(map_image);
@@ -554,10 +545,10 @@ int main(int argc, char *argv[])
  exit(0);
 }
 
-int find_street(void)   
-{
-  return 0;
-}
+// int find_street(void)   
+// {
+//   return 0;
+// }
 
 // int drive_along_street(void)
 // {
@@ -841,16 +832,26 @@ void execute_move_sim(int *hit_count)
   return; 
 }
 
+void execute_move_sim_arrived(int *hit_count)
+{
+  // This is a simulated version of execute_move for testing purposes only
+  *hit_count = execute_sim_arrived[sim_counter_arrived++];
+  printf("Simulated hit count, hit_count=%d\n", *hit_count);
+
+  return; 
+}
+
 void scan_intersection_sim_arrived(int *tl, int *tr, int *br, int *bl)
 {
  // This is a simulated version of scan_intersection for testing purposes only
  // sims colors
- printf("Simulating scan_intersection for sim_counter=%d\n", sim_counter);
- if (sim_counter < SIM_COUNT) {
-  *tl = color_sim[sim_counter][0];
-  *tr = color_sim[sim_counter][1];
-  *br = color_sim[sim_counter][2];
-  *bl = color_sim[sim_counter][3];
+ printf("Simulating scan_intersection for sim_counter after localization=%d\n", sim_counter_arrived);
+ if (sim_counter_arrived < SIM_COUNT_ARRIVED) {
+  *tl = color_sim[sim_counter_arrived][0];
+  *tr = color_sim[sim_counter_arrived][1];
+  *br = color_sim[sim_counter_arrived][2];
+  *bl = color_sim[sim_counter_arrived][3];
+  printf("Simulated scan_intersection arrived: tl=%d, tr=%d, br=%d, bl=%d\n", *tl, *tr, *br, *bl);
   return; 
  }
  return; 
@@ -911,10 +912,10 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
     if (cur_x == target_x && cur_y == target_y) {
       // 可选：最后再扫一次增强鲁棒
       int tl,tr,br,bl;
-      if (scan_intersection(&tl,&tr,&br,&bl)) {
-        int z[4] = {tl,tr,br,bl};
-        updateBelief(z);
-      }
+      scan_intersection_sim_arrived(&tl,&tr,&br,&bl); 
+      int z[4] = {tl,tr,br,bl};
+      updateBelief(z);
+
       // 再检查一次在线置信度（允许用更低阈值）
       int bi, bd; double bv;
       current_argmax(&bi,&bd,&bv);
@@ -923,24 +924,23 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
     }
 
     // 1) 每步先做一次扫描 + 测量更新（边走边定位）
-    {
-      int tl,tr,br,bl;
-      if (scan_intersection(&tl,&tr,&br,&bl)) {
-        int z[4] = {tl,tr,br,bl};
-        updateBelief(z);
-      }
-      // 取当前最优估计
-      int bi, bd; double bv;
-      current_argmax(&bi,&bd,&bv);
-      cur_x = bi % sx;
-      cur_y = bi / sx;
-      cur_dir = bd;
+    int tl,tr,br,bl;
+    scan_intersection_sim_arrived(&tl,&tr,&br,&bl);
+    int z[4] = {tl,tr,br,bl};
+    updateBelief(z);
 
-      // 在线置信度太低 → 交回上层做 relocalize
-      if (bv < nav_thresh) return 0;
-    }
+    // 取当前最优估计
+    int bi, bd; double bv;
+    current_argmax(&bi,&bd,&bv);
+    cur_x = bi % sx;
+    cur_y = bi / sx;
+    cur_dir = bd;
+
+    // 在线置信度太低 → 交回上层做 relocalize
+    if (bv < nav_thresh) return 0;
 
     // 2) 决定下一步朝哪走（简单曼哈顿：先 X 后 Y）
+    // printf("step 2\n");
     int desired_dir = cur_dir;
     if      (cur_x < target_x) desired_dir = DIR_RIGHT;
     else if (cur_x > target_x) desired_dir = DIR_LEFT;
@@ -954,11 +954,13 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
       printf("Turning right 90 degrees to face %d\n", desired_dir);
       rotateBeliefsRight();         // 朝向分布右旋一次
     } else if (delta == 2) {        // 掉头180
-      turn_at_intersection(DIR_DOWN);
+      // turn_at_intersection(DIR_DOWN);
+      printf("Turning back 180 degrees to face %d\n", desired_dir);
       rotateBeliefsRight();
       rotateBeliefsRight();
     } else if (delta == 3) {        // 左转90  == 右转三次
-      turn_at_intersection(DIR_LEFT);
+      // turn_at_intersection(DIR_LEFT);
+      printf("Turning left 90 degrees to face %d\n", desired_dir);
       rotateBeliefsRight();
       rotateBeliefsRight();
       rotateBeliefsRight();
@@ -968,10 +970,11 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
 
     // 4) 沿当前方向行驶到下一路口（execute_move 内部保证到下一个路口停下）
     int hit_count = 0;
-    execute_move_sim(&hit_count);
+    // execute_move_sim_arrived(&hit_count);
 
     // 5) Motion update：将所有朝向的假设各自前进一步
     actionModel();
+    printf("Moved one step forward towards (%d, %d)\n", target_x, target_y);
 
     // 6) 若碰到红边（hit_count > 0），根据你的 robot_localization 约定同步朝向 belief：
     //    你在 localization 里把“撞红边→右转→再走”编码成 rotateBeliefsRight() + actionModel()。
@@ -988,10 +991,9 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
     // 7) 到达新路口后再测一次（更稳）
     {
       int tl,tr,br,bl;
-      if (scan_intersection(&tl,&tr,&br,&bl)) {
-        int z[4] = {tl,tr,br,bl};
-        updateBelief(z);
-      }
+      scan_intersection_sim_arrived(&tl,&tr,&br,&bl);
+      int z[4] = {tl,tr,br,bl};
+      updateBelief(z);
     }
 
     // 8) 更新一次当前估计并检查在线置信度
