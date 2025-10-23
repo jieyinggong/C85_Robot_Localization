@@ -6,11 +6,6 @@
 #include "EV3_RobotControl/btcomm.h"
 #include "const.h"
 
-
-////////////////////////////////////////
-// Color calibration measurement 
-////////////////////////////////////////
-
 void color_calibration()
 {
     // possible changes:
@@ -26,7 +21,7 @@ void color_calibration()
 
     HSVRange ranges[COLOR_COUNT];
 
-    for (int i=0; i<COLOR_COUNT; i++){    // Color order: black, white, red, yellow, green, blue
+    for (int i=0; i<COLOR_COUNT; i++){    // Color order: BLACK, BLUE, GREEN, YELLOW, RED, WHITE
         double H_min = 1e9, S_min = 1e9, V_min = 1e9;
         double H_max = -1e9, S_max = -1e9, V_max = -1e9;
         double H_sum = 0.0, S_sum = 0.0, V_sum = 0.0;
@@ -213,11 +208,6 @@ void rgba_to_hsv(int R, int G, int B, int A, double *H, double *S, double *V)
     return; 
 }
 
-
-////////////////////////////////////////
-// Color determination
-////////////////////////////////////////
-
 void read_color_calibration(HSVRange *ranges)
 {
     FILE *fp = fopen("color_calibration.txt", "r");
@@ -279,11 +269,6 @@ int classify_color_hsv(int R, int G, int B, int A)
     }
     return C_UNKNOWN;
 }
-
-
-////////////////////////////////////////
-// Color probability measurement
-////////////////////////////////////////
 
 void color_probability(){
     // possible changes: 

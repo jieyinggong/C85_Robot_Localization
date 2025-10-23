@@ -7,19 +7,13 @@
 #include <unistd.h>
 #include <ctime>
 
-////////////////////////////////////////
-// Constants
-////////////////////////////////////////
-
+// constants
 #define EPS 1e-6
 #define COLOR_SAMPLE_COUNT 6
 #define COLOR_READ_COUNT 50
 #define COLOR_COUNT 6
 
-////////////////////////////////////////
-// Data structures
-////////////////////////////////////////
-
+// data structures
 typedef struct {
     double H_min, H_max, H_avg;
     double S_min, S_max, S_avg;
@@ -31,41 +25,26 @@ typedef struct {
     double probability;
 } ColorProbability;
 
-////////////////////////////////////////
-// Global variables
-////////////////////////////////////////
-
+// global variables
 extern HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
 extern ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
 
-////////////////////////////////////////
-// Color calibration
-////////////////////////////////////////
-
+// color calibration functions
 void color_calibration(void);
 void adjust_hue_overlaps(HSVRange *ranges);
 void adjust_black_white_thresholds(HSVRange *ranges);
 void print_get_color_calibration(int i);
 
-////////////////////////////////////////
-// Color conversion
-////////////////////////////////////////
-
+// color conversion
 void rgba_to_hsv(int R, int G, int B, int A, double *H, double *S, double *V);
 
-////////////////////////////////////////
-// Color determination
-////////////////////////////////////////
-
+// color determination
 void read_color_calibration(HSVRange *ranges);
 int classify_color_hsv(int R, int G, int B, int A);
 
-////////////////////////////////////////
-// Color probability
-////////////////////////////////////////
-
+// color probability functions
 void color_probability(void);
 void read_color_probability(ColorProbability *color_probabilities); 
 
 
-#endif // CALIBRATION_H
+#endif

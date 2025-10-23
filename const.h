@@ -27,4 +27,4 @@
 #define LEFT_MOTOR MOTOR_A
 #define RIGHT_MOTOR MOTOR_D
 
-#endif // CONST_H
+#endif
