@@ -169,9 +169,24 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
 }
 
 // MINTY!!!
-static void execute_move(int *hit_count){
- // drive_along_street();
+static void execute_move(int *hit_count) {
+  int border_flag = 0;
+
+  while (1) {
+    drive_along_street(1, &border_flag);
+
+    if (border_flag > 0) {
+      (*hit_count)++;
+      turn_right_90_degrees();
+    } else {
+      break;  
+    }
+
+    if (*hit_count >= 2) break;
+    sleep(1);
+  }
 }
+
 
 // 将地图四角(TL,TR,BR,BL)按朝向 dir 顺时针旋转 dir 步，得到“机器人视角下应看到的顺序”
 static inline void expected_corners_for_dir(int idx, int dir, int out4[4]){
@@ -697,8 +712,15 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
    ***********************************************************************************************************************/
   // If not already on street, acquire it first
   // *Minty - find street and drive along it to reach an intersection
-  //find_street();
-  // drive_along_street();
+  // init to find street and intersection
+  find_street(1);
+  BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 1200, 80);
+  BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 1200, 100);
+  sleep(2);
+  recorrect_to_black();
+  int border_flag = 0;
+  drive_along_street(1, border_flag);
+  sleep(1);
   // Minty* - you need to consider case that hit intersection
 
   // Random seed for action selection
