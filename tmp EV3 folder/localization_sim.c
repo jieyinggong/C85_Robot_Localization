@@ -748,24 +748,20 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
       actionModel();
     }
 
-    {
-      int tl,tr,br,bl;
-      if (scan_intersection(&tl,&tr,&br,&bl)) {
-        int z[4] = {tl,tr,br,bl};
-        updateBelief(z);
-      }
+    int tl,tr,br,bl;
+    if (scan_intersection(&tl,&tr,&br,&bl)) {
+      int z[4] = {tl,tr,br,bl};
+      updateBelief(z);
     }
 
-    {
-      int bi, bd; double bv;
-      current_argmax(&bi,&bd,&bv);
-      cur_x = bi % sx;
-      cur_y = bi / sx;
-      cur_dir = bd;
+    int bi, bd; double bv;
+    current_argmax(&bi,&bd,&bv);
+    cur_x = bi % sx;
+    cur_y = bi / sx;
+    cur_dir = bd;
 
-      if (bv < nav_thresh) {
-        return 0;
-      }
+    if (bv < nav_thresh) {
+      return 0;
     }
   }
   return 0;
