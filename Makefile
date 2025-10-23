@@ -3,7 +3,7 @@ CC = g++
 CFLAGS = -w -O2 -I"EV3_RobotControl"
 
 # Target name
-TARGET = ev3_robot
+TARGET = ev3_robot_sim
 
 # Source and object files
 SRCS = $(wildcard *.c EV3_RobotControl/btcomm.c)
