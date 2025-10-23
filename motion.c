@@ -478,6 +478,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
 int leftright_turn_degrees(int direction, double target_angle){
     int angle = 0, rate = 0;
+    printf("Turning %s %.1f degrees...\n", (direction == 1) ? "right" : "left", target_angle);
 
     /* Reset gyro to zero */
     if (BT_read_gyro(GYRO_PORT, 1, &angle, &rate) != 1) {
@@ -485,26 +486,29 @@ int leftright_turn_degrees(int direction, double target_angle){
         return -1;
     }
 
-    BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 600, 80);
-    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 80, 600, 80);
+    BT_timed_motor_port_start(LEFT_MOTOR, 7, 100, 600, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 600, 80);
     usleep(1000);
 
+    
+
     if (direction == 1) {
-        /* Turn right */
-         BT_turn(LEFT_MOTOR, 15, RIGHT_MOTOR, -10);
+        /* Turn right *
         /* Monitor until angle reaches about +90 degrees */
         while (angle < target_angle - 0.5) {
+            BT_turn(LEFT_MOTOR, 15, RIGHT_MOTOR, -10);
             if (BT_read_gyro(GYRO_PORT, 0, &angle, &rate) != 1) {
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
             }
          //   fprintf(stderr, "Turning right: Current angle = %d\n", angle);
         }
+        // printf("Finished turning right: Final angle = %d\n", angle);
     } else {
-        BT_turn(LEFT_MOTOR, -10, RIGHT_MOTOR, 13);
 
         // Monitor the angle until it reaches 90 degrees
         while (angle > -target_angle + 0.5) {
+            BT_turn(LEFT_MOTOR, -10, RIGHT_MOTOR, 13);
             if (BT_read_gyro(GYRO_PORT, 0, &angle, &rate) != 1) {
                 fprintf(stderr, "Failed to read gyro sensor.\n");
                 break;
@@ -512,6 +516,7 @@ int leftright_turn_degrees(int direction, double target_angle){
         }
     }
     // Stop the motors
+    // printf("stop motors\n");
     BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop with active brake
     usleep(10000);
 

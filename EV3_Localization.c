@@ -437,13 +437,14 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
- int tl, tr, br, bl;
- if (detect_intersection() == 0) {
-   fprintf(stderr, "Not at an intersection to start with, exiting...\n");
-   free(map_image);
-   BT_close();
-   exit(0);
- }
+  // printf("Turn left 90 degrees\n"); 
+  // turn_left_90_degrees();
+
+  // printf("Turn right 90 degrees\n"); 
+  // turn_right_90_degrees();
+// 
+  printf("Turn back 180 degrees\n");
+  turn_back_180_degrees();
 
   free(map_image);
   BT_close();
@@ -504,20 +505,20 @@ int find_street(void)
 //   return(0);
 // }
 
-int detect_intersection(void)
-{
- /*
-  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
-  * you like, but it should be reliable and robust.
-  * 
-  * The return value should be 1 if an intersection is detected, and 0 otherwise.
-  */   
-  // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
-  return(0);
-}
-
-int scan_intersection(int *tl, int *tr, int *br, int *bl)
-{
+// int detect_intersection(void)
+// {
+//  /*
+//   * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
+//   * you like, but it should be reliable and robust.
+//   * 
+//   * The return value should be 1 if an intersection is detected, and 0 otherwise.
+//   */   
+//   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
+//   return(0);
+// }
+// 
+// int scan_intersection(int *tl, int *tr, int *br, int *bl)
+// {
  /*
   * This function carries out the intersection scan - the bot should (obviously) be placed at an intersection for this,
   * and the specific set of actions will depend on how you designed your bot and its sensor. Whatever the process, you
@@ -563,7 +564,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 //  return(0);
  
 // }
-}
+// }
 
 int turn_at_intersection(int turn_direction)
 {
