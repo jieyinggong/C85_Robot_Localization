@@ -194,11 +194,9 @@ static int build_feasible_directions(int outDirs[4]){
   return n;
 }
 
-// execute the chosen move: turn to absolute dir, leave the intersection, and follow street to next one
-static void execute_move(int absDir){
-  turn_at_intersection(absDir);  // your helper aligns & points to desired absolute direction
-  sleep(3);
-  drive_along_street();          // cross intersection + follow the black line to the next intersection
+// MINTY!!!
+static void execute_move(int *hit_count){
+  drive_along_street();
 }
 
 // 将地图四角(TL,TR,BR,BL)按朝向 dir 顺时针旋转 dir 步，得到“机器人视角下应看到的顺序”
@@ -323,53 +321,39 @@ void updateBelief(int moveDir, int readings[4])
   normalize_beliefs();
 }
 
-void actionModel(int moveDir)
+// copy current beliefs into the relative "forward" intersections' beliefs for every 4 directions respectively
+void actionModel()
 {
-  static double newBeliefs[400][4];
-  static unsigned char hasIncoming[400][4];
-
-  // 清零累加数组与“是否有来源进入”的标记
-  memset(newBeliefs, 0, sizeof(newBeliefs));
-  memset(hasIncoming, 0, sizeof(hasIncoming));
-
-  // 把每个状态沿 moveDir 平移一格；越界的来源直接丢弃（不加回）
+  // update beliefs
+  int dx[4] = {0, 1, 0, -1};
+  int dy[4] = {-1, 0, 1, 0};
+  static double newBeliefs[400][4] = {0.001}; // 初始化为小值，避免全0
   for (int idx = 0; idx < sx * sy; idx++) {
-    int x = idx_to_x(idx);
-    int y = idx_to_y(idx);
-
     for (int dir = 0; dir < 4; dir++) {
-      double mass = beliefs[idx][dir];
-      if (mass <= 0.0) continue; // 无质量，跳过
-
-      int nx = x, ny = y;
-      if      (moveDir == DIR_UP)    ny--;
-      else if (moveDir == DIR_RIGHT) nx++;
-      else if (moveDir == DIR_DOWN)  ny++;
-      else if (moveDir == DIR_LEFT)  nx--;
-
-      // invalid
-      if (nx < 0 || nx >= sx || ny < 0 || ny >= sy) {
-        continue;
-      }
-
-      int j = xy_to_idx(nx, ny);
-      newBeliefs[j][dir] += mass;         // 方向不变，只平移位置
-      hasIncoming[j][dir] = 1;            // 标记：这个状态有来源质量进入
-    }
-  }
-
-  // 给所有“没有任何来源进入”的状态加一个极小地板值
-  for (int j = 0; j < sx * sy; j++) {
-    for (int d = 0; d < 4; d++) {
-      if (!hasIncoming[j][d]) {
-        newBeliefs[j][d] += FLOOR_EPS;
+      int newX = idx_to_x(idx) + dx[dir];
+      int newY = idx_to_y(idx) + dy[dir];
+      if (newX >= 0 && newX < sx && newY >= 0 && newY < sy) {
+        int newIdx = xy_to_idx(newX, newY);
+        newBeliefs[newIdx][dir] = beliefs[idx][dir];
       }
     }
   }
-
-  // 覆盖并归一化
   memcpy(beliefs, newBeliefs, sizeof(newBeliefs));
+  // normalize beliefs
   normalize_beliefs();
+}
+
+void rotateBeliefsRight()
+{
+  // for every individual beliefs [up, right, down, left], rotate them one unit to the right: i.e., [left, up, right, down]
+  static double newBeliefs[400][4];
+  for (int idx = 0; idx < 400; idx++) {
+    newBeliefs[idx][0] = beliefs[idx][3];
+    newBeliefs[idx][1] = beliefs[idx][0];
+    newBeliefs[idx][2] = beliefs[idx][1];
+    newBeliefs[idx][3] = beliefs[idx][2];
+  }
+  memcpy(beliefs, newBeliefs, sizeof(newBeliefs));
 }
 
 int main(int argc, char *argv[])
@@ -606,7 +590,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 //  return(0);
  
 // }
-// }
+}
 
 int turn_at_intersection(int turn_direction)
 {
@@ -691,17 +675,15 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
    ***********************************************************************************************************************/
   // If not already on street, acquire it first
   // *Minty - find street and drive along it to reach an intersection
-  // find_street();
-  // drive_along_street();
-  // Minty*
+  find_street();
+  drive_along_street();
+  // Minty* - you need to consider case that hit intersection
 
   // Random seed for action selection
   srand((unsigned int)time(NULL));
 
   int scans = 0;
   int lastMoveDir = DIR_UP; // arbitrary init; only used by updateBelief if your design needs it
-  
-  // test: assume start at a intersection
 
   while (1)
   {
@@ -728,19 +710,30 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
       break;
     }
 
-    // 3) Choose a random feasible absolute direction, then execute the move
-    int dirs[4]; 
-    int n = build_feasible_directions(dirs);
-    int moveDir = dirs[rand() % n];
-
-    // *Minty
-    execute_move(moveDir);
-    // Minty*
-
-    // 4) Motion update (deterministic straight-line model provided by your helper)
-    actionModel(moveDir);
-
-    lastMoveDir = moveDir;
+    // 3) *Motion Step* Always drive forward to next intersection until red border is detected
+    //    If red border is detected, always turn right then drive forward to next intersection
+    int hit_count = 0;
+    execute_move(&hit_count);
+    
+    // 4) Update beliefs (and normalize)
+    //    Case 1 - If only drive forward, update beliefs (*shift* beliefs forward for every four direction)
+    //    Case 2 - If red border detected, turn right & drive forward, 
+    //             update beliefs (first: *rotate* individual beliefs to right, second: do case 1 - *shift* beliefs forward for every four direction)
+    //    Case 3 - Hit red border 2 times (after the first right turn & drive forward, hit red border again),
+    //             turn right again & drive forward, update beliefs (first: *rotate* individual beliefs two times to right,
+    //             second: do case 1 - *shift* beliefs forward for every four direction)
+    if (hit_count == 0) {
+      actionModel();
+    }
+    else if (hit_count == 1) {
+      rotateBeliefsRight();
+      actionModel();
+    }
+    else if (hit_count == 2) {
+      rotateBeliefsRight();
+      rotateBeliefsRight();
+      actionModel();
+    }
   }
 
  // Localization succeeded (we broke out of the loop when confident)
