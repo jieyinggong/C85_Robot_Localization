@@ -564,49 +564,55 @@ int drive_along_street(int dir, int* border_flag)
   */   
 
   // Test driving forward
-  fprintf(stderr, "Testing drive forward...\n");
-  //BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+  fprintf(stderr, "Starting drive_along_street (dir=%d)\n", dir);
 
-  // Test stopping with brake mode
-  // stop when detect intersection
-  int detected = detect_intersection();
-  int start_flag = 0;
-  while (detected == 0) {
-    if (start_flag == 0){
-        fprintf(stderr, "Driving along the street...\n");
-        start_flag = 1;
-          BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 6, dir *5);
-    }
-    detected = detect_intersection();
-  }
-  BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
-  if (detected == 1){
-      fprintf(stderr, "Intersection detected during drive.\n");
-      return 1; // success
-  }
-  if (detected == 2){
-        // MEET BORDER!! back to last intersection and turn right
-        if (*(border_flag) <=0){
-        dir = -dir;  // Stop
+  int started = 0;
+
+  while (1) {
+    int detected = detect_intersection();
+
+    if (detected == 0) {
+        if (!started) {
+            fprintf(stderr, "On the street, starting to drive forward...\n");
+            started = 1;
+            BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 6, dir * 5);
         }
-        BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 8, dir * 7);
-        sleep(1);
-        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
-         (*border_flag)++;
-         fprintf(stderr, "drive back until intersection meet with direction = %d, and border_flag = %d \n", dir, *(border_flag));
-        drive_along_street(dir, border_flag);
-        // intersection check & correct if needed
-     // fprintf(stderr, "hit border.\n");
-      //return 2;
-  }
-  if (detected == 3){
-      fprintf(stderr, "other case.\n");
+      continue;
+    }
+
+    BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+    if (detected == 1) {
+      fprintf(stderr, "Intersection detected. Stopping.\n");
+      return 1;
+    }
+
+    if (detected == 2) {
+        if (border_flag != NULL && *border_flag <= 0){
+            dir = -dir;
+        }
+      (*border_flag)++;
+      fprintf(stderr, "Border detected! Backing up. (count=%d)\n", *border_flag);
+
+      BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 8, dir * 7);
+      sleep(1);
+      BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+      started = 0;
+      continue;  // retry main loop
+    }
+
+    if (detected == 3) {
+      fprintf(stderr, "Minor deviation detected. Correcting...\n");
       micro_swing_correction(8);
-      drive_along_street(dir, border_flag);
+      started = 0;
+      continue;
+    }
+    usleep(10000); // 10 ms
   }
-  sleep(1);
-  return 1; 
+
+  return 1;
 }
+
 
 void verify_and_recorrect_internal(int depth)
 {

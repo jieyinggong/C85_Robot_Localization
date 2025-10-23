@@ -172,17 +172,17 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
 static void execute_move(int *hit_count) {
   int border_flag = 0;
 
-  while (1) {
-    drive_along_street(1, &border_flag);
-
-    if (border_flag > 0) {
+  while (*hit_count < 2) {
+    int res = drive_along_street(1, &border_flag);
+    if (res == 1 && border_flag == 0) {
+      break;
+    } 
+    else if (border_flag > 0) {
       (*hit_count)++;
       turn_right_90_degrees();
-    } else {
-      break;  
+      border_flag = 0;
+      continue;
     }
-
-    if (*hit_count >= 2) break;
     sleep(1);
   }
 }
