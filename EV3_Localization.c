@@ -170,7 +170,7 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
 
 // MINTY!!!
 static void execute_move(int *hit_count){
-  drive_along_street();
+ // drive_along_street();
 }
 
 // 将地图四角(TL,TR,BR,BL)按朝向 dir 顺时针旋转 dir 步，得到“机器人视角下应看到的顺序”
@@ -442,17 +442,45 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
- int tl, tr, br, bl;
- if (detect_intersection() == 0) {
-   fprintf(stderr, "Not at an intersection to start with, exiting...\n");
-   free(map_image);
-   BT_close();
-   exit(0);
- }
 
-  free(map_image);
+ // ============= motion control test =============
+
+  // init find intersection test
+  //  find_street(1);
+  //  int rotate_power = 10;
+  //  BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 150*rotate_power, 80);
+  //  BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 150*rotate_power, 100);
+  //  recorrect_to_black();
+  // sleep(2);
+  // BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 800, 80);
+  // BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 800, 100);
+  // sleep(2);
+  // recorrect_to_black(8, 1);
+  // sleep(2);
+  int border_flag = 0;
+  int res = drive_along_street(1, &border_flag);
+  fprintf(stderr, "drive along street result: %d\n", res);
+
+  // sleep(2);
+
+  // turn right 90 degrees test
+  // turn_right_90_degrees();
+  // sleep(1);
+  // turn_right_90_degrees();
+  // sleep(1);
+
+ // micro_swing_correction(8);
+
+//  turn_left_90_degrees();
+//  turn_left_90_degrees();
+ // turn_back_180_degrees();
+  sleep(1);
+
   BT_close();
- exit(0); 
+  free(map_image);
+  exit(0);
+
+ // ============= motion control test  =============
  
  int robot_x = -1;
  int robot_y = -1;
@@ -658,8 +686,8 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
    ***********************************************************************************************************************/
   // If not already on street, acquire it first
   // *Minty - find street and drive along it to reach an intersection
-  find_street();
-  drive_along_street();
+  //find_street();
+  // drive_along_street();
   // Minty* - you need to consider case that hit intersection
 
   // Random seed for action selection
