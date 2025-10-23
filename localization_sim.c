@@ -152,7 +152,7 @@ int SIM_COUNT = 13;
 // };
 
 // route 2
-int execute_sim[] = {2, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0}; //, 0, 1};
+int execute_sim[] = {2, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1};
 int color_sim[][4] = {
   {C_WHITE, C_GREEN, C_WHITE, C_BLUE},
   
@@ -169,8 +169,8 @@ int color_sim[][4] = {
 
   {C_GREEN, C_WHITE, C_BLUE, C_WHITE},
   {C_GREEN, C_BLUE, C_GREEN, C_WHITE},
-  //{C_BLUE, C_WHITE, C_GREEN, C_WHITE},
-  //{C_GREEN, C_WHITE, C_BLUE, C_WHITE}
+  {C_BLUE, C_WHITE, C_GREEN, C_WHITE},
+  {C_GREEN, C_WHITE, C_BLUE, C_WHITE}
 
 };
 
