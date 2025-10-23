@@ -12,10 +12,14 @@ All probabilities are intialized uniformly because robot has no prior knowledge 
 So the initial value for each probability = 1 / (4 x m x n)
 __________________________________________________________________________________________________________________________________
 
-TODO: Not sure
 Q3. Describe your strategy for dealing with sensor noise, and explain why it should work and how you tested it.
 
-Calibration?
+- color calibration - it prompts the user to take color samples for the same color at multiple different points in the map,
+and takes COLOR_SAMPLES amount of samples. It stores the average, min, and max for each color. Then, it may adjust the hue borders
+of the colors to make sure they don't overlap, and for the hue of black and white, it uses the hue average, min, max to make a gaussian
+distribution, and get a 97.5% CI on one side to disregard possible outliers. 
+
+- weighted majority vote when doing scan intersection
 __________________________________________________________________________________________________________________________________
 
 Q4. Describe your probability update function in detail and explain how you defined 'agreement' as well as how you 
@@ -34,12 +38,18 @@ we multiply the belief with the corresponding color miss probability.
 The updated belief will be *= probability of each color hit/miss (4 times, for each TL, TR, BR, BL corner).
 __________________________________________________________________________________________________________________________________
 
-???
 Q5. Describe in detail your robot’s exploration strategy – it should be more complex than simply moving in the same direction
     until hitting the boundary of the map. How did you choose this strategy?
 
-We just ask the robot to move forward. If it hits the boundary of the map, it will reverse back and then turn right and 
-continues.
+At the beginning, the robot is placed on a random position, in a random direction on the map. We first ask it to find a street, 
+and then make sure it's traveling straight on the street. If it hits a border before it can travel straight and hit an intersection,
+it will turn back (of course). When it is traveling straight and hits its first intersection, it will scan it and we'll update 
+our beliefs. If it moves forward and hits a border, it will backup to the intersection it was at, and turn right to travel foward. 
+If it hits a border again, we have it turn 180 from its original position, and rotate our beliefs to match it. 
+
+We chose this strategy because we had the most faith in our forward moving motor functions as opposed to turning left and right. 
+The left turning and right turning, after 10-15 times, might diverge from the street, and we'd had to find the street again.
+As such, we tried to minimize the number of turns we have to make before localization and finding the target. 
 __________________________________________________________________________________________________________________________________
 
 TODO:
@@ -47,7 +57,9 @@ Q6. Describe in detail how beliefs are shifted when the robot gets to a boundary
     way to handle this is not obvious. Explain clearly what assumptions regarding the robot's motion support your strategy 
     for shifting belief values in this case.
 
-If it hits boundary, we just reverse back so not really shifting beliefs yet?
+If it hits boundary, 
+
+we just reverse back so not really shifting beliefs yet?
 The motions after (turn right & drive forward) make beliefs shifted.
 __________________________________________________________________________________________________________________________________
 
@@ -101,5 +113,5 @@ Q13. Are there locations in the map that make localization harder? (i.e. does it
 Yes, there are some harder starting locations. Multiple intersections with some directions look the same (same color readings) and
 this makes their beliefs to be the same initially. But eventaully, one belief should stand out when the robot moves further.
 
-Starting in a unique intersection can help faster convergence.
+Starting in a unique intersection can help faster convergence. Also, if we start close to a border, it might help narrow it down.
 __________________________________________________________________________________________________________________________________
