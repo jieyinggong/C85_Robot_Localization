@@ -519,22 +519,22 @@ int find_street(void)
   return 0;
 }
 
-int drive_along_street(void)
-{
- /*
-  * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
-  * the map. It stops at an intersection.
-  * 
-  * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
-  * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
-  * or the course instructor for help carrying out your plan.
-  * 
-  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
-  * bot after calling this function.
-  */   
+// int drive_along_street(void)
+// {
+//  /*
+//   * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
+//   * the map. It stops at an intersection.
+//   * 
+//   * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
+//   * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
+//   * or the course instructor for help carrying out your plan.
+//   * 
+//   * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
+//   * bot after calling this function.
+//   */   
 
-  return(0);
-}
+//   return(0);
+// }
 
 // int detect_intersection(void)
 // {
