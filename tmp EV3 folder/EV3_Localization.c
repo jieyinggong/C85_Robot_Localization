@@ -169,9 +169,24 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
 }
 
 // MINTY!!!
-static void execute_move(int *hit_count){
-  drive_along_street();
+static void execute_move(int *hit_count) {
+  int border_flag = 0;
+
+  while (*hit_count < 2) {
+    int res = drive_along_street(1, &border_flag);
+    if (res == 1 && border_flag == 0) {
+      break;
+    } 
+    else if (border_flag > 0) {
+      (*hit_count)++;
+      turn_right_90_degrees();
+      border_flag = 0;
+      continue;
+    }
+    sleep(1);
+  }
 }
+
 
 // 将地图四角(TL,TR,BR,BL)按朝向 dir 顺时针旋转 dir 步，得到“机器人视角下应看到的顺序”
 static inline void expected_corners_for_dir(int idx, int dir, int out4[4]){
@@ -446,9 +461,44 @@ int main(int argc, char *argv[])
   printf("Turn back 180 degrees\n");
   turn_back_180_degrees();
 
-  free(map_image);
+ // ============= motion control test =============
+
+  // init find intersection test
+  //  find_street(1);
+  //  int rotate_power = 10;
+  //  BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 150*rotate_power, 80);
+  //  BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 150*rotate_power, 100);
+  //  recorrect_to_black();
+  // sleep(2);
+  // BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 800, 80);
+  // BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 800, 100);
+  // sleep(2);
+  // recorrect_to_black(8, 1);
+  // sleep(2);
+  int border_flag = 0;
+  int res = drive_along_street(1, &border_flag);
+  fprintf(stderr, "drive along street result: %d\n", res);
+
+  // sleep(2);
+
+  // turn right 90 degrees test
+  // turn_right_90_degrees();
+  // sleep(1);
+  // turn_right_90_degrees();
+  // sleep(1);
+
+ // micro_swing_correction(8);
+
+//  turn_left_90_degrees();
+//  turn_left_90_degrees();
+ // turn_back_180_degrees();
+  sleep(1);
+
   BT_close();
- exit(0); 
+  free(map_image);
+  exit(0);
+
+ // ============= motion control test  =============
  
  int robot_x = -1;
  int robot_y = -1;
@@ -471,10 +521,10 @@ int main(int argc, char *argv[])
  exit(0);
 }
 
-int find_street(void)   
-{
-  return 0;
-}
+// int find_street(void)   
+// {
+//   return 0;
+// }
 
 // int drive_along_street(void)
 // {
@@ -490,6 +540,19 @@ int find_street(void)
 //   * bot after calling this function.
 //   */   
 
+  // Test driving forward
+  // fprintf(stderr, "Testing drive forward...\n");
+  // BT_drive(MOTOR_A, MOTOR_D, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+
+  // // Test stopping with brake mode
+  // // stop when detect intersection
+  // if (detect_intersection()) {
+  //   fprintf(stderr, "Detected intersection, stopping...\n");
+  //   BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
+  //   sleep(1);
+  //   return 1; // Successfully reached an intersection
+  // }
+
 //   return(0);
 // }
 
@@ -516,54 +579,54 @@ int find_street(void)
 //   // use this function: int BT_read_colour_RGBraw_NXT(char sensor_port, int *R, int *G, int *B, int *A);
 //   return(0);
 // }
-// 
+
 // int scan_intersection(int *tl, int *tr, int *br, int *bl)
 // {
- /*
-  * This function carries out the intersection scan - the bot should (obviously) be placed at an intersection for this,
-  * and the specific set of actions will depend on how you designed your bot and its sensor. Whatever the process, you
-  * should make sure the intersection scan is reliable - i.e. the positioning of the sensor is reliably over the buildings
-  * it needs to read, repeatably, and as the robot moves over the map.
-  * 
-  * Use the APIs sensor reading calls to poll the sensors. You need to remember that sensor readings are noisy and 
-  * unreliable so * YOU HAVE TO IMPLEMENT SOME KIND OF SENSOR / SIGNAL MANAGEMENT * to obtain reliable measurements.
-  * 
-  * Recall your lectures on sensor and noise management, and implement a strategy that makes sense. Document your process
-  * in the code below so your TA can quickly understand how it works.
-  * 
-  * Once your bot has read the colours at the intersection, it must return them using the provided pointers to 4 integer
-  * variables:
-  * 
-  * tl - top left building colour
-  * tr - top right building colour
-  * br - bottom right building colour
-  * bl - bottom left building colour
-  * 
-  * The function's return value can be used to indicate success or failure, or to notify your code of the bot's state
-  * after this call.
-  */
+//  /*
+//   * This function carries out the intersection scan - the bot should (obviously) be placed at an intersection for this,
+//   * and the specific set of actions will depend on how you designed your bot and its sensor. Whatever the process, you
+//   * should make sure the intersection scan is reliable - i.e. the positioning of the sensor is reliably over the buildings
+//   * it needs to read, repeatably, and as the robot moves over the map.
+//   * 
+//   * Use the APIs sensor reading calls to poll the sensors. You need to remember that sensor readings are noisy and 
+//   * unreliable so * YOU HAVE TO IMPLEMENT SOME KIND OF SENSOR / SIGNAL MANAGEMENT * to obtain reliable measurements.
+//   * 
+//   * Recall your lectures on sensor and noise management, and implement a strategy that makes sense. Document your process
+//   * in the code below so your TA can quickly understand how it works.
+//   * 
+//   * Once your bot has read the colours at the intersection, it must return them using the provided pointers to 4 integer
+//   * variables:
+//   * 
+//   * tl - top left building colour
+//   * tr - top right building colour
+//   * br - bottom right building colour
+//   * bl - bottom left building colour
+//   * 
+//   * The function's return value can be used to indicate success or failure, or to notify your code of the bot's state
+//   * after this call.
+//   */
  
-//   /************************************************************************************************************************
-//    *   TO DO  -   Complete this function
-//    ***********************************************************************************************************************/
-//   /************************************************************************************************************************
-//    *   TO DO  -   Complete this function
-//    ***********************************************************************************************************************/
+// //   /************************************************************************************************************************
+// //    *   TO DO  -   Complete this function
+// //    ***********************************************************************************************************************/
+// //   /************************************************************************************************************************
+// //    *   TO DO  -   Complete this function
+// //    ***********************************************************************************************************************/
 
-//  // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
-//  *(tl)=-1;
-//  *(tr)=-1;
-//  *(br)=-1;
-//  *(bl)=-1;
-//  return(0);
-//  // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
-//  *(tl)=-1;
-//  *(tr)=-1;
-//  *(br)=-1;
-//  *(bl)=-1;
-//  return(0);
+// //  // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
+// //  *(tl)=-1;
+// //  *(tr)=-1;
+// //  *(br)=-1;
+// //  *(bl)=-1;
+// //  return(0);
+// //  // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
+// //  *(tl)=-1;
+// //  *(tr)=-1;
+// //  *(br)=-1;
+// //  *(bl)=-1;
+// //  return(0);
  
-// }
+// // }
 // }
 
 int turn_at_intersection(int turn_direction)
@@ -649,14 +712,24 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
    ***********************************************************************************************************************/
   // If not already on street, acquire it first
   // *Minty - find street and drive along it to reach an intersection
-  find_street();
-  drive_along_street();
+  // init to find street and intersection
+  find_street(1);
+  BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 1200, 80);
+  BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 1200, 100);
+  sleep(2);
+  recorrect_to_black();
+  int border_flag = 0;
+  drive_along_street(1, border_flag);
+  sleep(1);
   // Minty* - you need to consider case that hit intersection
 
   // Random seed for action selection
   srand((unsigned int)time(NULL));
 
   int scans = 0;
+  int lastMoveDir = DIR_UP; // arbitrary init; only used by updateBelief if your design needs it
+  
+  // test: assume start at a intersection
 
   while (1)
   {
@@ -875,7 +948,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
-  // color_calibration();
+   color_calibration();
   // 
   // printf("Calibration complete, now measuring colour probabilities...\n");
   // getchar();
