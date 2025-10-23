@@ -171,7 +171,11 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
 // MINTY!!!
 static void execute_move(int *hit_count) {
   int border_flag = 0;
-
+  BT_timed_motor_port_start(LEFT_MOTOR, 8, 100, 1500, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+  BT_timed_motor_port_start(RIGHT_MOTOR, 7, 120, 1500, 100); // Start motor C with power 6, ramp up time 500ms
+   // BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
+//fprintf(stderr, "Drive forward to start point of scan.\n");
+    sleep(3);
   while (*hit_count < 2) {
     int res = drive_along_street(1, &border_flag);
     if (res == 1 && border_flag == 0) {
@@ -381,8 +385,8 @@ int main(int argc, char *argv[])
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
   *   read your calibration data for use in your localization code. Skip this if you are not using calibration
   * ****************************************************************************************************************/
-  // read_color_calibration(ranges);
-  // read_color_probability(color_probabilities);
+  read_color_calibration(ranges);
+  read_color_probability(color_probabilities);
   
  // Your code for reading any calibration information should not go below this line //
  
@@ -928,7 +932,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
-   color_calibration();
+  // color_calibration();
   // 
   // printf("Calibration complete, now measuring colour probabilities...\n");
   // getchar();
