@@ -40,11 +40,11 @@ int detect_intersection(void)
     else {
     // the case for not on the street nor intersection
      // fprintf(stderr, "Not an intersection\n");
-      return 2;
+      return 3;
     }
   } else {
     fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-    return 2;
+    return -1;
   }
 }
 
