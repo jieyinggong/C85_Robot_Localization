@@ -366,7 +366,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     total_votes += color_vote[region][color];
                 }
 
-                if (region_color[region] == C_OTHER || (unknown_votes / total_votes > 0.5)) {
+                if (region_color[region] == C_UNKNOWN || (unknown_votes / total_votes > 0.5)) {
                     fprintf(stderr, "Region %d has unknown color or over 50%% unknown votes. Performing specified check...\n", region);
 
                     // Calculate average angle for unknown color in this region
@@ -432,7 +432,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
                     // Recalculate the final color for this region
                     double max_votes = 0;
-                    int best_color = C_OTHER; // Default to UNKNOWN
+                    int best_color = C_UNKNOWN; // Default to UNKNOWN
                     for (int color = 0; color < 7; ++color) {
                         if ((color == C_BLUE || color == C_GREEN || color == C_WHITE) && color_vote[region][color] > max_votes) {
                             max_votes = color_vote[region][color];

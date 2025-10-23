@@ -204,7 +204,7 @@ static inline void expected_corners_for_dir(int idx, int dir, int out4[4]){
 // 从 color_probabilities[] 取命中率；若未加载或异常，给一个保守默认值
 static inline double get_color_hit_prob(int c){
   // 仅对 WHITE/GREEN/BLUE 用到（交叉口），其余颜色用不到也返回个默认
-  if (c < 0 || c > 5) return 0.85;
+  if (c < 1 || c > 6) return 0.85;
   double p = color_probabilities[c].probability;
   // 稍作夹取，避免 0 或 1 导致数值问题
   if (p < 0.55) p = 0.55;
@@ -307,14 +307,19 @@ void actionModel()
   // update beliefs
   int dx[4] = {0, 1, 0, -1};
   int dy[4] = {-1, 0, 1, 0};
-  static double newBeliefs[400][4] = {0.001}; // 初始化为小值，避免全0
+  double newBeliefs[15][4];
+  for (int idx = 0; idx < sx * sy; idx++) {
+    for (int d = 0; d < 4; d++) {
+      newBeliefs[idx][d] = FLOOR_EPS;   // 小而非零
+    }
+  }
   for (int idx = 0; idx < sx * sy; idx++) {
     for (int dir = 0; dir < 4; dir++) {
       int newX = idx_to_x(idx) + dx[dir];
       int newY = idx_to_y(idx) + dy[dir];
       if (newX >= 0 && newX < sx && newY >= 0 && newY < sy) {
         int newIdx = xy_to_idx(newX, newY);
-        newBeliefs[newIdx][dir] = beliefs[idx][dir];
+        newBeliefs[newIdx][dir] += beliefs[idx][dir];
       }
     }
   }
@@ -505,20 +510,38 @@ int main(int argc, char *argv[])
  int direction = 0;
  robot_localization(&robot_x, &robot_y, &direction);
  fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
- int success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
- while (!success) {
+ int success = robot_localization(&robot_x, &robot_y, &direction);
+ if (success) {
+  fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
+  // print current all beliefs
+  for (int j=0; j<sy; j++) {
+    for (int i=0; i<sx; i++) {
+      int idx = i + (j * sx);
+      fprintf(stderr, "B[%2d,%2d] = [%.4f, %.4f, %.4f, %.4f]\n", i, j,
+        beliefs[idx][0], beliefs[idx][1], beliefs[idx][2], beliefs[idx][3]);
+    }
+  }
+  free(map_image);
+  exit(0);
+  } else {
+   fprintf(stderr, "Localization failed! Robot could not determine its location.\n");
+   free(map_image);
+   exit(1);
+  }
+  success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
+  while (!success) {
     // re-localize
-    robot_localization(&robot_x, &robot_y, &direction);
+    success = robot_localization(&robot_x, &robot_y, &direction);
     fprintf(stderr, "Re-localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
     success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
- }
- fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
- // TODO: robot can do something cool to show mission complete! like dance (keep 360% crazy rotating & playing a song)
+  }
+  fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
+  // TODO: robot can do something cool to show mission complete! like dance (keep 360% crazy rotating & playing a song)
 
- // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
- BT_close();
- free(map_image);
- exit(0);
+  // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
+  BT_close();
+  free(map_image);
+  exit(0);
 }
 
 // int find_street(void)   
@@ -719,7 +742,7 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
   sleep(2);
   recorrect_to_black();
   int border_flag = 0;
-  drive_along_street(1, border_flag);
+  drive_along_street(1, &border_flag);
   sleep(1);
   // Minty* - you need to consider case that hit intersection
 
