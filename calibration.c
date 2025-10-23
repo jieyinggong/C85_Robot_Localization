@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "calibration.h"
 #include "EV3_RobotControl/btcomm.h"
+#include "const.h"
 
 
 ////////////////////////////////////////
@@ -45,7 +46,7 @@ void color_calibration()
                 double H, S, V;
                 rgba_to_hsv(R, G, B, A, &H, &S, &V);
 
-                if (i == 2){    // red case, can wrap around
+                if (i == C_RED){    // red case, can wrap around
                     if (H < 180){
                         H += 360.0;
                     }
@@ -72,7 +73,7 @@ void color_calibration()
         S_avg = S_sum / (valid_count);
         V_avg = V_sum / (valid_count);
 
-        if (i == 2){ 
+        if (i == C_RED){ 
             if (H_max >= 360.0) H_max -= 360.0;
             if (H_avg >= 360.0) H_avg -= 360.0;
             if (H_min >= 360.0) H_min -= 360.0;
@@ -81,9 +82,9 @@ void color_calibration()
         ranges[i] = (HSVRange){H_min, H_max, H_avg, S_min, S_max, S_avg, V_min, V_max, V_avg};
 
         // print non adjusted values
-        printf("Color %d max HSV = (%.2f, %.2f, %.2f)\n", i, H_max, S_max, V_max);
-        printf("Color %d min HSV = (%.2f, %.2f, %.2f)\n", i, H_min, S_min, V_min);
-        printf("Color %d average HSV = (%.2f, %.2f, %.2f)\n", i, H_avg, S_avg, V_avg);
+        printf("Color %d max HSV = (%.2f, %.2f, %.2f)\n", i+1, H_max, S_max, V_max);
+        printf("Color %d min HSV = (%.2f, %.2f, %.2f)\n", i+1, H_min, S_min, V_min);
+        printf("Color %d average HSV = (%.2f, %.2f, %.2f)\n", i+1, H_avg, S_avg, V_avg);
     }
 
     adjust_hue_overlaps(ranges); // adjust overlaps starting from RED
@@ -93,12 +94,12 @@ void color_calibration()
     for (int i = 0; i < COLOR_COUNT; i++) {
         // print to file
         fprintf(fp, "%d: H[%.1f, %.1f, %.1f], S[%.2f, %.2f, %.2f], V[%.2f, %.2f, %.2f]\n",  
-                i, ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
+                i+1, ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
                 ranges[i].S_min, ranges[i].S_max, ranges[i].S_avg, ranges[i].V_min, ranges[i].V_max, ranges[i].V_avg);
 
         // print to console
         printf("%d: H[%.1f, %.1f, %.1f], S[%.2f, %.2f, %.2f], V[%.2f, %.2f, %.2f]\n",
-                i, ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
+                i+1, ranges[i].H_min, ranges[i].H_max, ranges[i].H_avg,
                 ranges[i].S_min, ranges[i].S_max, ranges[i].S_avg, ranges[i].V_min, ranges[i].V_max, ranges[i].V_avg);
     }
 
@@ -112,8 +113,8 @@ void adjust_hue_overlaps(HSVRange *ranges) {
     // if ranges overlap, set the boundary to the midpoint of the overlap minus/plus delta
 
     const double delta = 1.0;   // can adjust
-    for (int i = 2; i < COLOR_COUNT - 1; i++) {
-        for (int j = i + 1; j < COLOR_COUNT; j++) {
+    for (int i = 1; i < COLOR_COUNT - 2; i++) {
+        for (int j = i + 1; j < COLOR_COUNT - 1; j++) {
             if (ranges[i].H_max > ranges[j].H_min && ranges[i].H_min < ranges[j].H_max) {
                 double mid = (ranges[i].H_max + ranges[j].H_min) / 2.0;
                 ranges[i].H_max = mid - delta;
@@ -122,6 +123,11 @@ void adjust_hue_overlaps(HSVRange *ranges) {
                 // clamp to [0,360)
                 if (ranges[i].H_max > 360.0) ranges[i].H_max -= 360.0;
                 if (ranges[j].H_min < 0.0)   ranges[j].H_min += 360.0;
+
+                if (ranges[i].H_max == ranges[i].H_min) {
+                    ranges[i].H_max = ranges[i].H_max + 1;
+                    ranges[i].H_min = ranges[i].H_min - 1; 
+                }
             }
         }
     }
@@ -158,8 +164,8 @@ void adjust_black_white_thresholds(HSVRange *ranges) {
 void print_get_color_calibration(int i)
 {
     // for command line ui
-    
-    const char *names[] = {"BLACK", "WHITE", "RED", "YELLOW", "GREEN", "BLUE"};
+
+    const char *names[] = {"BLACK", "BLUE", "GREEN", "YELLOW", "RED", "WHITE"};
     printf("Place %s under the sensor and press Enter...\n", names[i]);
     getchar();
 }
@@ -247,30 +253,31 @@ int classify_color_hsv(int R, int G, int B, int A)
     rgba_to_hsv(R, G, B, A, &H, &S, &V);
 
     // check black and white first
-    if (V <= ranges[0].V_max && S <= ranges[0].S_max) {
-        return 0; // black
+    //printf("H: %.2f, S: %.2f, V: %.2f, V_max: %.2f, S_max: %.2f, V_min: %.2f, S_max: %.2f\n", H, S, V, ranges[C_BLACK-1].V_max, ranges[C_BLACK-1].S_max, ranges[C_WHITE-1].V_min, ranges[C_WHITE-1].S_max);
+    if (V <= ranges[C_BLACK-1].V_max && S <= ranges[C_BLACK-1].S_max) {
+        return C_BLACK; // black
     }
-    if (V >= ranges[1].V_min && S <= ranges[1].S_max) {
-        return 1; // white
+    if (V >= ranges[C_WHITE-1].V_min && S <= ranges[C_WHITE-1].S_max) {
+        return C_WHITE; // white
     }
     // not black or white, check other colors
     // printf("H: %.2f, S: %.2f, V: %.2f, V_min: %.2f, V_max: %.2f\n", H, S, V, ranges[2].V_min, ranges[2].V_max);
-    if (ranges[2].H_min <= ranges[2].H_max) {
+    if (ranges[C_RED-1].H_min <= ranges[C_RED-1].H_max) {
         // Normal (non-wrapping) range
-        if (H >= ranges[2].H_min && H <= ranges[2].H_max)
-            return 2;
+        if (H >= ranges[C_RED-1].H_min && H <= ranges[C_RED-1].H_max)
+            return C_RED;
     } else {
         // Wrapping range (e.g. 300 to 60)
-        if (H >= ranges[2].H_min || H <= ranges[2].H_max)
-            return 2;
+        if (H >= ranges[C_RED-1].H_min || H <= ranges[C_RED-1].H_max)
+            return C_RED;
     }
 
-    for (int i = 3; i < COLOR_COUNT; i++) {
+    for (int i = 1; i < 4; i++) {
         if (H >= ranges[i].H_min && H <= ranges[i].H_max) { // hue matters more than saturation in color detection so you could take it out ig
-            return i; // return color index
+            return i+1; // return color index
         }
     }
-    return 6;
+    return C_UNKNOWN;
 }
 
 
@@ -288,7 +295,7 @@ void color_probability(){
         fprintf(stderr, "Failed to open file for color probability.\n");
         return;
     }
-    const char *names[] = {"BLACK", "WHITE", "RED", "YELLOW", "GREEN", "BLUE"};
+    const char *names[] = {"BLACK", "BLUE", "GREEN", "YELLOW", "RED", "WHITE"};
 
     for (int i = 0; i < 6; i++) {
         int success_count = 0;
@@ -306,14 +313,14 @@ void color_probability(){
             printf("Measured color index: %d\n", color);
 
             // if classified color matches expected color success count + 1
-            if (color == i) {
+            if (color == i+1) {
                 success_count++;
             }
         }
 
         double probability = (double)success_count / (total_count);
-        printf("Color %d probability: %.2f\n", i, probability);
-        fprintf(fp, "Color %d probability: %.2f\n", i, probability);
+        printf("Color %d probability: %.2f\n", i+1, probability);
+        fprintf(fp, "Color %d probability: %.2f\n", i+1, probability);
     }
 
     fclose(fp);
@@ -331,7 +338,7 @@ void read_color_probability(ColorProbability *color_probabilities)
     int i = 0;
     while (fgets(line, sizeof(line), fp)) {
         sscanf(line, "Color %*d probability: %lf", &color_probabilities[i].probability);
-        printf("Read color probability: %.2f\n", color_probabilities[i].probability);
+        printf("Read color probability %d: %.2f\n", i+1, color_probabilities[i].probability);
         i++;
     }
 

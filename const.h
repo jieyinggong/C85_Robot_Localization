@@ -20,6 +20,7 @@
 #define C_YELLOW  4
 #define C_RED     5
 #define C_WHITE   6
+#define C_UNKNOWN 7
 
 #define COLOR_PORT PORT_1
 #define GYRO_PORT PORT_2

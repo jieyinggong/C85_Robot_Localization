@@ -390,20 +390,20 @@ int main(int argc, char *argv[])
  dest_x=atoi(argv[2]);
  dest_y=atoi(argv[3]);
 
-  // Open a socket to the EV3 for remote controlling the bot.
- // if (BT_open(HEXKEY)!=0)
- // {
- //  fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
- //  fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
- //  free(map_image);
- //  exit(1);
- // }
-// 
- // if (dest_x==-1&&dest_y==-1)
- // {
- //  calibrate_sensor();
- //  exit(1);
- // }
+// Open a socket to the EV3 for remote controlling the bot.
+  if (BT_open(HEXKEY)!=0)
+  {
+    fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
+    fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
+    free(map_image);
+    exit(1);
+  }
+
+  if (dest_x==-1&&dest_y==-1)
+  {
+    calibrate_sensor();
+    exit(1);
+  }
 
  /******************************************************************************************************************
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
@@ -998,8 +998,9 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   // printf("Calibration complete, now measuring colour probabilities...\n");
   // getchar();
 
-  read_color_calibration(ranges);
-  color_probability(); 
+  // read_color_calibration(ranges);
+  // color_probability(); 
+  read_color_probability(color_probabilities);
   return;
 }
 
