@@ -2,16 +2,29 @@ Do you feel this project helped you to understand the following ideas:
 (please answer yes, no, somewhat, and comment on what if anything could have improved your learning experience).
 
 1. The main steps of a robot localization algorithm
+yes
+comment:
 
 2. Dealing with real-world sensors
+yes
+comment:
 
 3. Dealing with real-world motors and robot motions
+yes
+comment:
 
 4. Using probabilities to keep track of belief about a robot's position
+yes
+comment:
 
 5. Managing uncertainty (e.g. in the quality of sensor readings, or accuracy of robot motions)
+yes
+comment:
 
 6. Do you feel confident you could implement a probabilistic localization algorithm for a more complex robot,
    working in a real world environment? (please explain your answer)
+somewhat?
+comment:
 
 7. Any other comments regarding your experience with this project?
+It's difficult, but fun! Love this course.

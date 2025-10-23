@@ -1,30 +1,105 @@
+__________________________________________________________________________________________________________________________________
+
 Q1. What is the total number of probabilities your robot has to keep track of for a map of size m x n?
+
+For a map of size m x n, there are 4 probabilities (up, right, down, left) at each intersection.
+So the total number of probabilities = 4 x m x n
+__________________________________________________________________________________________________________________________________
 
 Q2. What should be the initial value of the probabilities your robot is keeping track of?
 
+All probabilities are intialized uniformly because robot has no prior knowledge of its position or orientation.
+So the initial value for each probability = 1 / (4 x m x n)
+__________________________________________________________________________________________________________________________________
+
+TODO: Not sure
 Q3. Describe your strategy for dealing with sensor noise, and explain why it should work and how you tested it.
+
+Calibration?
+__________________________________________________________________________________________________________________________________
 
 Q4. Describe your probability update function in detail and explain how you defined 'agreement' as well as how you 
     determined the amount by which to update probabilities.
 
+So firstly we need to scan the current intersection and get a color reading of 4 corners (TL, TR, BR, BL).
+Then, the probability update function will compare the sensor readings with the "expected" map colors
+at every intersection for every direction.
+
+Moreover, we calibrate to get the color_probabilities[6] for every color, so we have probabilities of color hit
+and color miss for every color.
+
+If there is one color match, we multiply the belief with the corresponding color hit probability; If there is a color dismatch, 
+we multiply the belief with the corresponding color miss probability.
+
+The updated belief will be *= probability of each color hit/miss (4 times, for each TL, TR, BR, BL corner).
+__________________________________________________________________________________________________________________________________
+
+???
 Q5. Describe in detail your robot’s exploration strategy – it should be more complex than simply moving in the same direction
     until hitting the boundary of the map. How did you choose this strategy?
 
+We just ask the robot to move forward. If it hits the boundary of the map, it will reverse back and then turn right and 
+continues.
+__________________________________________________________________________________________________________________________________
+
+TODO:
 Q6. Describe in detail how beliefs are shifted when the robot gets to a boundary. Consider this problem carefully, the correct
     way to handle this is not obvious. Explain clearly what assumptions regarding the robot's motion support your strategy 
     for shifting belief values in this case.
 
+If it hits boundary, we just reverse back so not really shifting beliefs yet?
+The motions after (turn right & drive forward) make beliefs shifted.
+__________________________________________________________________________________________________________________________________
+
 Q7. Describe in detail how beliefs are shifted when the robot turns 90 degrees (either left or right) without going to a different
     intersection. Describe your assumptions about robot motion, and how these support your strategy for handling this case.
 
+When turning left or right (without going to a different intersection), the four direction beliefs rotate:
+- if turning right, beliefs for every intersection rotate from Bel[...][4] = [P[...][up], P[...][right], P[...][down], P[...][left]]
+  to new Bel[...][4] = [P[...][left], P[...][up], P[...][right], P[...][down]]
+- (similarly), if turning left, belief will rotate in opposite direction.
+__________________________________________________________________________________________________________________________________
+
 Q8. Explain your method for deciding when the robot has achieved correct localization.
+
+Our method is that we have a certainty_threshold (set to 0.8). If the largest belief >= certainty_threshold, then we are pretty
+certain about complete localization.
+__________________________________________________________________________________________________________________________________
 
 Q9. Briefly explain your robot design choices, including sensor placement and robot mobility considerations.
 
+We install 2 sensors, one NXT color sensor and one gyro sensor. The color sensor is installed at the front of the robot and points
+to the ground. We try to install it as low as possible to achieve better accuracy of sensor color reading. The gyro sensor is
+installed at the top of the robot and is centered between 2 wheels, so it can detect rotation angle more accurately.
+
+The install 2 motors attaching to left and right wheels for mobility. The motors are independently driven for precise turning and
+straight driving at the hardware level.
+
+We also install 2 little drivers for cuteness :D
+__________________________________________________________________________________________________________________________________
+
+TODO: not sure
 Q10. What parameters did you find affect the most the ability of the robot to determine its location?
+
+Sensor calibration, lighting consistency, robot alignment during scans......
+__________________________________________________________________________________________________________________________________
 
 Q11. Can external factors (illumination in the room, for example) affect the ability of the robot to find itself?
 
+Yes!!! The external factors like illumination in the zoom affect the robot's color sensor readings a lot. That's why we need to
+calibrate the robot every time in a new environment.
+__________________________________________________________________________________________________________________________________
+
+TODO:
 Q12. On average, how many intersections does your robot need to visit to achieve successful localization?
 
+Hahaha, I don't know. We haven't tested it yet. (Guess 4-6?)
+__________________________________________________________________________________________________________________________________
+
 Q13. Are there locations in the map that make localization harder? (i.e. does it matter where your robot starts its journey? Why?)
+
+Yes, there are some harder starting locations. Multiple intersections with some directions look the same (same color readings) and
+this makes their beliefs to be the same initially. But eventaully, one belief should stand out when the robot moves further.
+
+Starting in a unique intersection can help faster convergence.
+__________________________________________________________________________________________________________________________________
