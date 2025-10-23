@@ -547,7 +547,7 @@ int drive_along_street(void)
   * 
   * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
   * bot after calling this function.
-  */
+  */   
 
   // Test driving forward
   fprintf(stderr, "Testing drive forward...\n");

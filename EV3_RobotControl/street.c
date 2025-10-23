@@ -14,6 +14,7 @@ void verify_and_recorrect_internal(int depth)
     // forward
     BT_timed_motor_port_start(MOTOR_A, 7, 80, 1000, 80);
     BT_timed_motor_port_start(MOTOR_D, 6, 100, 1000, 100);
+    BT_timed_motor_port_start(MOTOR_D, 6, 100, 1000, 100);
     sleep(2);
     BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
     color_forward =classify_color_hsv(R, G, B, A);
@@ -25,6 +26,7 @@ void verify_and_recorrect_internal(int depth)
     sleep(2);
 
     BT_timed_motor_port_start(MOTOR_A, -7, 80, 1000, 80);
+    BT_timed_motor_port_start(MOTOR_D, -6, 100, 1000, 100);
     BT_timed_motor_port_start(MOTOR_D, -6, 100, 1000, 100);
     sleep(2);
     BT_read_colour_RGBraw_NXT(PORT_3, &R, &G, &B, &A);
@@ -81,6 +83,7 @@ void recorrect_to_black_internal(int depth)
         {
             printf("[Correction #%d] Reacquired black line.\n", depth);
             BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);
+            BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);
             break;
         }
 
@@ -103,7 +106,9 @@ void recorrect_to_black_internal(int depth)
         BT_read_gyro(PORT_2, 1, &angle, &rate);
         int dir = 1;
         BT_turn(MOTOR_A, 0, MOTOR_D, 10 * dir);
+        BT_turn(MOTOR_A, 0, MOTOR_D, 10 * dir);
         sleep(1);
+        BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);
         BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);
 
         // Forward (angle compensation)
@@ -207,15 +212,12 @@ int drive_along_street(void)
 
   // Test driving forward
   fprintf(stderr, "Testing drive forward...\n");
-  BT_drive(MOTOR_A, MOTOR_D, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
+  //BT_drive(MOTOR_A, MOTOR_C, 12, 10); // pretty straight forward, will implement PID (use gyro) if have time
 
   // Test stopping with brake mode
   // stop when detect intersection
-  if (detect_intersection()) {
-    fprintf(stderr, "Detected intersection, stopping...\n");
-    BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
-    sleep(1);
-    return 1; // Successfully reached an intersection
+  while (detect_intersection() == 0) {
+    BT_drive(MOTOR_A, MOTOR_C, 6, 5);
   }
 
   fprintf(stderr, "Detected intersection, stopping...\n");
