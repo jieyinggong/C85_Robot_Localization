@@ -13,39 +13,48 @@ void recorrect_to_black_internal(int depth);
 // void micro_swing_correction(int rotate_power);
 int find_alternate_street(void);
 
+#define HISTORY_SIZE 5  
+#define MIN_VOTE     3
+
 int detect_intersection(void)
 {
- /*
-  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
-  * you like, but it should be reliable and robust.
-  * 
-  * The return value should be 1 if an intersection is detected, and 0 otherwise.
-  */   
-  int R, G, B, A;
-  int color = 6;
-  if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
-   // fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    color = classify_color_hsv(R, G, B, A);
-    if (color == C_YELLOW) { // Yellow
-      fprintf(stderr, "Detected intersection (Yellow)\n");
-      return 1; // meet intersection
-    } else if (color == C_BLACK) {
-     // fprintf(stderr, "Detected street (Black), not an intersection\n");
-      return 0; // on the street 
-    } else if (color ==C_RED){
-        // RETUR N
-        fprintf(stderr, "Detected border (Red), not an intersection\n");
-        return 2; // on the street
-    } 
-    else {
-    // the case for not on the street nor intersection
-     // fprintf(stderr, "Not an intersection\n");
-      return 3;
+    static int color_history[HISTORY_SIZE] = { C_BLACK }; // 初始化为黑
+    static int idx = 0;
+
+    int R, G, B, A, color = C_BLACK;
+    if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) != 1) {
+        fprintf(stderr, "[detect] Sensor read failed.\n");
+        return -1;
     }
-  } else {
-    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-    return -1;
-  }
+
+    color = classify_color_hsv(R, G, B, A);
+
+    color_history[idx] = color;
+    idx = (idx + 1) % HISTORY_SIZE;
+
+    int count_black = 0, count_yellow = 0, count_red = 0, count_other = 0;
+    for (int i = 0; i < HISTORY_SIZE; i++) {
+        switch (color_history[i]) {
+            case C_BLACK: count_black++; break;
+            case C_YELLOW: count_yellow++; break;
+            case C_RED: count_red++; break;
+            default: count_other++; break;
+        }
+    }
+
+    if (count_yellow >= MIN_VOTE) {
+        fprintf(stderr, "[detect] Intersection confirmed (YELLOW, %d/%d)\n", count_yellow, HISTORY_SIZE);
+        return 1;
+    } else if (count_red >= MIN_VOTE) {
+        fprintf(stderr, "[detect] Border confirmed (RED, %d/%d)\n", count_red, HISTORY_SIZE);
+        return 2;
+    } else if (count_black >= MIN_VOTE) {
+        // fprintf(stderr, "[detect] On street (BLACK)\n");
+        return 0;
+    } else {
+        fprintf(stderr, "[detect] Unstable color — treating as deviation.\n");
+        return 3;
+    }
 }
 
 int detect_intersection_or_street(void){
@@ -607,7 +616,7 @@ int drive_along_street(int dir, int* border_flag)
       started = 0;
       continue;
     }
-    usleep(10000); // 10 ms
+    usleep(20000); // 10 ms
   }
 
   return 1;
@@ -668,7 +677,7 @@ void verify_and_recorrect_internal(int depth)
         {
             printf("[Verify] Max recursion depth reached, stopping further correction.\n");
             if (find_alternate_street()) {
-                recorrect_to_black();
+                recorrect_to_black(1);
             }    
         }
     }
@@ -843,11 +852,11 @@ void micro_swing_correction(int rotate_power)
 
     while (swing_count < MAX_SWING * 2)
     {   
-        int time = (int)(STEP_TIME * (1.0 + 0.15 * swing_count * swing_count));
+        int time = (int)(STEP_TIME * (1.0 + 0.8 * swing_count));
 
         if (dir == 1){
-            BT_timed_motor_port_start(RIGHT_MOTOR, 8, 100, time, 100);
-            BT_timed_motor_port_start(LEFT_MOTOR, -6, 100, time, 100);
+            BT_timed_motor_port_start(RIGHT_MOTOR, 10, 100, time, 100);
+            BT_timed_motor_port_start(LEFT_MOTOR, -7, 100, time, 100);
         }
         else{
              BT_timed_motor_port_start(LEFT_MOTOR,  11, 100, time, 100);
@@ -860,13 +869,13 @@ void micro_swing_correction(int rotate_power)
         printf("[MicroCorrection] Swing #%d dir=%d color=%d with time %d\n", swing_count, dir, color, time);
 
         if (dir == 1){
-            BT_timed_motor_port_start(RIGHT_MOTOR,  -8, 100, time * 0.9, 100);
-             BT_timed_motor_port_start(LEFT_MOTOR,  6, 100, time * 0.9, 100);
+            BT_timed_motor_port_start(RIGHT_MOTOR,  -10, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(LEFT_MOTOR,  7, 100, time * 0.9, 100);
             
         }
         else{
-             BT_timed_motor_port_start(LEFT_MOTOR,  -10, 100, time * 0.9, 100);
-             BT_timed_motor_port_start(RIGHT_MOTOR,  6, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(LEFT_MOTOR,  -11, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(RIGHT_MOTOR,  7, 100, time * 0.9, 100);
         }
         usleep(1010*(time+500));
         
