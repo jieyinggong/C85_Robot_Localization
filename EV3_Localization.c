@@ -191,11 +191,6 @@ static inline double get_color_hit_prob(int c){
   // 仅对 WHITE/GREEN/BLUE 用到（交叉口），其余颜色用不到也返回个默认
   if (c < 0 || c > 5) return 0.85;
   double p = color_probabilities[c].probability;
-  if (!(p > 0.0 && p < 1.0)) {
-    // 合理默认：传感器分类在“期待为该色”时的命中率
-    // 你也可以给不同颜色不同默认，比如白 0.92、绿 0.88、蓝 0.90
-    p = 0.90;
-  }
   // 稍作夹取，避免 0 或 1 导致数值问题
   if (p < 0.55) p = 0.55;
   if (p > 0.99) p = 0.99;
