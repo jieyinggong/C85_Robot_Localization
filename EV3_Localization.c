@@ -191,11 +191,6 @@ static inline double get_color_hit_prob(int c){
   // 仅对 WHITE/GREEN/BLUE 用到（交叉口），其余颜色用不到也返回个默认
   if (c < 0 || c > 5) return 0.85;
   double p = color_probabilities[c].probability;
-  if (!(p > 0.0 && p < 1.0)) {
-    // 合理默认：传感器分类在“期待为该色”时的命中率
-    // 你也可以给不同颜色不同默认，比如白 0.92、绿 0.88、蓝 0.90
-    p = 0.90;
-  }
   // 稍作夹取，避免 0 或 1 导致数值问题
   if (p < 0.55) p = 0.55;
   if (p > 0.99) p = 0.99;
@@ -442,6 +437,14 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
+  // printf("Turn left 90 degrees\n"); 
+  // turn_left_90_degrees();
+
+  // printf("Turn right 90 degrees\n"); 
+  // turn_right_90_degrees();
+// 
+  printf("Turn back 180 degrees\n");
+  turn_back_180_degrees();
 
  // ============= motion control test =============
 
@@ -487,7 +490,15 @@ int main(int argc, char *argv[])
  int direction = 0;
  robot_localization(&robot_x, &robot_y, &direction);
  fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
- go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
+ int success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
+ while (!success) {
+    // re-localize
+    robot_localization(&robot_x, &robot_y, &direction);
+    fprintf(stderr, "Re-localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
+    success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
+ }
+ fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
+ // TODO: robot can do something cool to show mission complete! like dance (keep 360% crazy rotating & playing a song)
 
  // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
  BT_close();
@@ -776,9 +787,123 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
    *   TO DO  -   Complete this function
    ***********************************************************************************************************************/
   
-   // localize along the way to target
-   return 1;
- }
+  // 在线导航时的较低阈值（你在 const 里已有 NAV_CERTAINTY_THRESHOLD）
+  const double nav_thresh = NAV_CERTAINTY_THRESHOLD; // e.g. 0.65
+
+  // 当前最优估计（起点用调用方提供的定位结果初始化）
+  int cur_x = robot_x;
+  int cur_y = robot_y;
+  int cur_dir = direction;
+
+  // 防止极端情况下死循环
+  const int MAX_STEPS = sx * sy * 8;
+  int steps = 0;
+
+  while (steps++ < MAX_STEPS) {
+    // 0) 如果已经到达目标，就做一次确认扫描（可选），然后成功返回
+    if (cur_x == target_x && cur_y == target_y) {
+      // 可选：最后再扫一次增强鲁棒
+      int tl,tr,br,bl;
+      if (scan_intersection(&tl,&tr,&br,&bl)) {
+        int z[4] = {tl,tr,br,bl};
+        updateBelief(z);
+      }
+      // 再检查一次在线置信度（允许用更低阈值）
+      int bi, bd; double bv;
+      current_argmax(&bi,&bd,&bv);
+      if (bv >= nav_thresh) return 1;   // 成功到达且定位仍然可信
+      else return 0;                    // 位置不稳，建议外层重新定位
+    }
+
+    // 1) 每步先做一次扫描 + 测量更新（边走边定位）
+    {
+      int tl,tr,br,bl;
+      if (scan_intersection(&tl,&tr,&br,&bl)) {
+        int z[4] = {tl,tr,br,bl};
+        updateBelief(z);
+      }
+      // 取当前最优估计
+      int bi, bd; double bv;
+      current_argmax(&bi,&bd,&bv);
+      cur_x = bi % sx;
+      cur_y = bi / sx;
+      cur_dir = bd;
+
+      // 在线置信度太低 → 交回上层做 relocalize
+      if (bv < nav_thresh) return 0;
+    }
+
+    // 2) 决定下一步朝哪走（简单曼哈顿：先 X 后 Y）
+    int desired_dir = cur_dir;
+    if      (cur_x < target_x) desired_dir = DIR_RIGHT;
+    else if (cur_x > target_x) desired_dir = DIR_LEFT;
+    else if (cur_y < target_y) desired_dir = DIR_DOWN;
+    else if (cur_y > target_y) desired_dir = DIR_UP;
+
+    // 3) 在路口进行转向（把相对转向映射成若干次右转；同时旋转 belief 的朝向维）
+    int delta = (desired_dir - cur_dir) & 3; // 0,1,2,3
+    if (delta == 1) {               // 右转90
+      turn_at_intersection(DIR_RIGHT);
+      rotateBeliefsRight();         // 朝向分布右旋一次
+    } else if (delta == 2) {        // 掉头180
+      turn_at_intersection(DIR_DOWN);
+      rotateBeliefsRight();
+      rotateBeliefsRight();
+    } else if (delta == 3) {        // 左转90  == 右转三次
+      turn_at_intersection(DIR_LEFT);
+      rotateBeliefsRight();
+      rotateBeliefsRight();
+      rotateBeliefsRight();
+    }
+    // 现在车身朝向 ≈ desired_dir；朝向 belief 也已同步旋转
+    cur_dir = desired_dir;
+
+    // 4) 沿当前方向行驶到下一路口（execute_move 内部保证到下一个路口停下）
+    int hit_count = 0;
+    execute_move(&hit_count);
+
+    // 5) Motion update：将所有朝向的假设各自前进一步
+    actionModel();
+
+    // 6) 若碰到红边（hit_count > 0），根据你的 robot_localization 约定同步朝向 belief：
+    //    你在 localization 里把“撞红边→右转→再走”编码成 rotateBeliefsRight() + actionModel()。
+    //    这里我们也做同样的同步（注意：这里的右转已由硬件层执行，rotate 只是在 belief 空间里同步朝向）。
+    if (hit_count == 1) {
+      rotateBeliefsRight();
+      actionModel();  // 红边右转并前进一步
+    } else if (hit_count == 2) {
+      rotateBeliefsRight();
+      rotateBeliefsRight();
+      actionModel();  // 180 转并前进一步
+    }
+
+    // 7) 到达新路口后再测一次（更稳）
+    {
+      int tl,tr,br,bl;
+      if (scan_intersection(&tl,&tr,&br,&bl)) {
+        int z[4] = {tl,tr,br,bl};
+        updateBelief(z);
+      }
+    }
+
+    // 8) 更新一次当前估计并检查在线置信度
+    {
+      int bi, bd; double bv;
+      current_argmax(&bi,&bd,&bv);
+      cur_x = bi % sx;
+      cur_y = bi / sx;
+      cur_dir = bd;
+
+      if (bv < nav_thresh) {
+        // 定位开始变差，交回上层触发重定位（或在此处也可写一小段“原地旋转再扫描”的自救）
+        return 0;
+      }
+    }
+  }
+
+  // 超过最大步数，认为失败
+  return 0;
+}
  
  void calibrate_sensor(void)
 {
