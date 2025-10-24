@@ -126,6 +126,12 @@ void adjust_hue_overlaps(HSVRange *ranges) {
             }
         }
     }
+    for (int i = 1; i < COLOR_COUNT - 2; i++) {
+        if (ranges[i].H_max == ranges[i].H_min) {
+            ranges[i].H_max = ranges[i].H_max + 1;
+            ranges[i].H_min = ranges[i].H_min - 1; 
+        }
+    }
 }
 
 
@@ -264,6 +270,7 @@ int classify_color_hsv(int R, int G, int B, int A)
 
     for (int i = 1; i < 4; i++) {
         if (H >= ranges[i].H_min && H <= ranges[i].H_max) { // hue matters more than saturation in color detection so you could take it out ig
+          //  printf("Classified color: %d\n", i+1);
             return i+1; // return color index
         }
     }

@@ -16,6 +16,6 @@ int turn_back_180_degrees(void);
 
 int find_street(int dir);
 void recorrect_to_black(void);
-void micro_swing_correction(int rotate_power);
+void micro_swing_correction(int rotate_power, int dir);
 
 #endif

@@ -159,6 +159,9 @@ static void execute_move(int *hit_count) {
     else if (border_flag > 0) {
       (*hit_count)++;
       turn_right_90_degrees();
+        BT_timed_motor_port_start(LEFT_MOTOR, 8, 100, 1500, 80);
+        BT_timed_motor_port_start(RIGHT_MOTOR, 7, 120, 1500, 100);
+        sleep(3);
       border_flag = 0;
       continue;
     }
@@ -525,11 +528,11 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
    *   TO DO  -   Complete this function
    ***********************************************************************************************************************/
   // init to find street and intersection
-  find_street(1);
-  BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 1200, 80);
-  BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 1200, 100);
-  sleep(2);
-  recorrect_to_black();
+  // find_street(1);
+  // BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 1200, 80);
+  // BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 1200, 100);
+  // sleep(2);
+  // recorrect_to_black();
   int border_flag = 0;
   drive_along_street(1, &border_flag);
   sleep(1);
@@ -725,6 +728,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
+  color_calibration();
   read_color_calibration(ranges);
   color_probability(); 
   return;

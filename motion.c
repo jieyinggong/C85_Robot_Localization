@@ -39,14 +39,30 @@ int detect_intersection(void)
             case C_BLACK: count_black++; break;
             case C_YELLOW: count_yellow++; break;
             case C_RED: count_red++; break;
+            case C_UNKNOWN: {
+               // count_other++; 
+                //count_black++;
+                break;
+            }; // treat unknown as black
             default: count_other++; break;
         }
     }
 
     int current_result = 3; 
-    if (count_yellow >= MIN_VOTE) current_result = 1;
-    else if (count_red >= MIN_VOTE) current_result = 2;
+    if (count_yellow >= 2) {
+        for (int i = 0; i < HISTORY_SIZE; i++) {
+            color_history[i] = C_BLACK;
+        }
+        fprintf(stderr, "[detect] Yellow detected, resetting history with yellow count = %d.\n", count_yellow);
+        current_result = 1;
+
+    } else if (count_red >= MIN_VOTE) {
+        current_result = 2;
+    }
     else if (count_black >= MIN_VOTE) current_result = 0;
+//    else current_result = 0;
+
+    
 
     // check stable
     // if (current_result == last_result)
@@ -122,8 +138,8 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
     sleep(1); // Wait a moment for the gyro to stabilize
     // drive forwarde to the start point of scan
-    BT_timed_motor_port_start(LEFT_MOTOR, 8, 100, 1500, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(RIGHT_MOTOR, 7, 120, 1500, 100); // Start motor C with power 6, ramp up time 500ms
+    BT_timed_motor_port_start(LEFT_MOTOR, 7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 120, 1400, 100); // Start motor C with power 6, ramp up time 500ms
    // BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
     fprintf(stderr, "Drive forward to start point of scan.\n");
     sleep(3); // Wait for the bot to reach the start point
@@ -488,10 +504,17 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                 fprintf(stderr, "Failed to read gyro sensor for final angle adjustment.\n");
             }
 
-        BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1400, 100);
-        BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1380, 100);
+        //BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1400, 100);
+       // BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1380, 100);
 
-        sleep(2); // Wait for the bot to return to original position
+        //sleep(2); // Wait for the bot to return to original position
+
+        BT_timed_motor_port_start(LEFT_MOTOR, -7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+    BT_timed_motor_port_start(RIGHT_MOTOR, -6, 120, 1400, 100); // Start motor C with power 6, ramp up time 500ms
+   //BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
+   // fprintf(stderr, "Drive forward to start point of scan.\n");
+    sleep(3); // Wait for the bot to reach the start point
+   
         fprintf(stderr, "Scan complete.\n");
 
     // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
@@ -591,6 +614,12 @@ int drive_along_street(int dir, int* border_flag)
 
   while (1) {
     int detected = detect_intersection();
+     if (detected == 2) {
+        if (border_flag != NULL && *border_flag <= 0){
+            dir = -dir;
+        }
+      (*border_flag)++;
+    }
 
     if (detected == 0) {
         if (!started) {
@@ -653,10 +682,6 @@ int drive_along_street(int dir, int* border_flag)
     }
 
     if (detected == 2) {
-        if (border_flag != NULL && *border_flag <= 0){
-            dir = -dir;
-        }
-      (*border_flag)++;
       fprintf(stderr, "Border detected! Backing up. (count=%d)\n", *border_flag);
 
       BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 8, dir * 7);
@@ -668,7 +693,7 @@ int drive_along_street(int dir, int* border_flag)
 
     if (detected == 3) {
       fprintf(stderr, "Minor deviation detected. Correcting...\n");
-      micro_swing_correction(8);
+      micro_swing_correction(8, dir);
       started = 0;
       continue;
     }
@@ -891,7 +916,7 @@ int find_alternate_street(void)
 }
 
 
-void micro_swing_correction(int rotate_power)
+void micro_swing_correction(int rotate_power, int dir)
 {
     int R = 0, G = 0, B = 0, A = 0;
     int color = -1;
@@ -901,7 +926,7 @@ void micro_swing_correction(int rotate_power)
 
     printf("[MicroCorrection] Starting small fan-sweep correction...\n");
 
-    int dir = 1;           
+    int swing_dir = 1;           
     int swing_count = 0;   
 
     BT_read_gyro(GYRO_PORT, 0, &angle, &rate);
@@ -910,13 +935,13 @@ void micro_swing_correction(int rotate_power)
     {   
         int time = (int)(STEP_TIME * (1.0 + 0.6 * swing_count));
 
-        if (dir == 1){
-            BT_timed_motor_port_start(RIGHT_MOTOR, 10, 100, time, 100);
-            BT_timed_motor_port_start(LEFT_MOTOR, -7, 100, time, 100);
+        if (swing_dir == 1){
+            BT_timed_motor_port_start(RIGHT_MOTOR, dir *10, 100, time, 100);
+            BT_timed_motor_port_start(LEFT_MOTOR, -7*dir, 100, time, 100);
         }
         else{
-             BT_timed_motor_port_start(LEFT_MOTOR,  11, 100, time, 100);
-              BT_timed_motor_port_start(RIGHT_MOTOR, -7, 100, time, 100);
+             BT_timed_motor_port_start(LEFT_MOTOR,  11*dir, 100, time, 100);
+              BT_timed_motor_port_start(RIGHT_MOTOR, -7*dir, 100, time, 100);
         }
         usleep(1010*(time+500));
 
@@ -924,29 +949,52 @@ void micro_swing_correction(int rotate_power)
         color = classify_color_hsv(R, G, B, A);
         printf("[MicroCorrection] Swing #%d dir=%d color=%d with time %d\n", swing_count, dir, color, time);
 
-        if (color == C_BLACK || color == C_YELLOW)
+        if (color == C_BLACK || color ==  C_YELLOW || color == C_RED)
         {
             printf("[MicroCorrection] Street line reacquired — stopping.\n");
-                BT_drive(LEFT_MOTOR, RIGHT_MOTOR, 8, 7);
+            if (color == C_YELLOW){
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+                break;
+            }
+                BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir*8, dir*7);
                 sleep(1);
                 BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
             BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
             break;
         }
 
-         if (dir == 1){
-            BT_timed_motor_port_start(RIGHT_MOTOR,  -10, 100, time * 0.9, 100);
-             BT_timed_motor_port_start(LEFT_MOTOR,  7, 100, time * 0.9, 100);
-            
+         if (swing_dir == 1){
+            BT_timed_motor_port_start(RIGHT_MOTOR,  -10*dir, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(LEFT_MOTOR,  7*dir, 100, time * 0.9, 100);
+
         }
         else{
-             BT_timed_motor_port_start(LEFT_MOTOR,  -11, 100, time * 0.9, 100);
-             BT_timed_motor_port_start(RIGHT_MOTOR,  7, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(LEFT_MOTOR,  -11*dir, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(RIGHT_MOTOR,  7*dir, 100, time * 0.9, 100);
         }
         usleep(1010*(time+500));
+
+        BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+        color = classify_color_hsv(R, G, B, A);
+        // printf("[MicroCorrection] Swing #%d dir=%d color=%d with time %d\n", swing_count, dir, color, time);
+
+        if (color == C_BLACK || color == C_YELLOW || color == C_RED)
+        {   
+            if (color == C_YELLOW){
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+                break;
+            }
+            printf("[MicroCorrection] Street line reacquired — stopping.\n");
+                BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir *8, dir*7);
+                sleep(1);
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
+            BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+            break;
+        }
+
         
 
-        dir = -dir;
+        swing_dir = -swing_dir;
         swing_count++;
 
        usleep(100000);
