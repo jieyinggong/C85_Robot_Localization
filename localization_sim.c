@@ -132,6 +132,7 @@ HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
 ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
 
 void scan_intersection_sim(int *tl, int *tr, int *br, int *bl);
+void scan_intersection_sim_arrived(int *tl, int *tr, int *br, int *bl);
 void execute_move_sim(int *hit_count);
 int sim_counter = 0;
 int SIM_COUNT = 13;
@@ -158,6 +159,30 @@ int color_sim[][4] = {
   
   {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
   {C_WHITE, C_GREEN, C_WHITE, C_BLUE}, 
+
+  {C_BLUE, C_BLUE, C_WHITE, C_GREEN}, 
+  {C_GREEN, C_WHITE, C_GREEN, C_BLUE},
+  {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
+  {C_BLUE, C_BLUE, C_WHITE, C_GREEN},
+
+  {C_WHITE, C_BLUE, C_WHITE, C_GREEN}, 
+  {C_BLUE, C_BLUE, C_WHITE, C_GREEN}, 
+
+  {C_GREEN, C_WHITE, C_BLUE, C_WHITE},
+  {C_GREEN, C_BLUE, C_GREEN, C_WHITE},
+  {C_BLUE, C_WHITE, C_GREEN, C_WHITE},
+  {C_GREEN, C_WHITE, C_BLUE, C_WHITE}
+
+};
+
+int sim_counter_arrived = 0;
+int SIM_COUNT_ARRIVED = 13;
+int execute_sim_arrived[] = {2, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1};
+int color_sim_arrived[][4] = {
+  // {C_WHITE, C_GREEN, C_WHITE, C_BLUE},
+  // 
+  // {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
+  // {C_WHITE, C_GREEN, C_WHITE, C_BLUE}, 
 
   {C_BLUE, C_BLUE, C_WHITE, C_GREEN}, 
   {C_GREEN, C_WHITE, C_GREEN, C_BLUE},
@@ -816,6 +841,21 @@ void execute_move_sim(int *hit_count)
   return; 
 }
 
+void scan_intersection_sim_arrived(int *tl, int *tr, int *br, int *bl)
+{
+ // This is a simulated version of scan_intersection for testing purposes only
+ // sims colors
+ printf("Simulating scan_intersection for sim_counter=%d\n", sim_counter);
+ if (sim_counter < SIM_COUNT) {
+  *tl = color_sim[sim_counter][0];
+  *tr = color_sim[sim_counter][1];
+  *br = color_sim[sim_counter][2];
+  *bl = color_sim[sim_counter][3];
+  return; 
+ }
+ return; 
+}
+
 void scan_intersection_sim(int *tl, int *tr, int *br, int *bl)
 {
  // This is a simulated version of scan_intersection for testing purposes only
@@ -910,7 +950,8 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
     // 3) 在路口进行转向（把相对转向映射成若干次右转；同时旋转 belief 的朝向维）
     int delta = (desired_dir - cur_dir) & 3; // 0,1,2,3
     if (delta == 1) {               // 右转90
-      turn_at_intersection(DIR_RIGHT);
+      // turn_at_intersection(DIR_RIGHT);
+      printf("Turning right 90 degrees to face %d\n", desired_dir);
       rotateBeliefsRight();         // 朝向分布右旋一次
     } else if (delta == 2) {        // 掉头180
       turn_at_intersection(DIR_DOWN);
