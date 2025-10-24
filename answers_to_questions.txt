@@ -14,12 +14,16 @@ ________________________________________________________________________________
 
 Q3. Describe your strategy for dealing with sensor noise, and explain why it should work and how you tested it.
 
-- color calibration - it prompts the user to take color samples for the same color at multiple different points in the map,
-and takes COLOR_SAMPLES amount of samples. It stores the average, min, and max for each color. Then, it may adjust the hue borders
-of the colors to make sure they don't overlap, and for the hue of black and white, it uses the hue average, min, max to make a gaussian
-distribution, and get a 97.5% CI on one side to disregard possible outliers. 
+1. Color calibration:
+It prompts the user to take color samples for the same color at multiple different points in the map, and takes COLOR_SAMPLES 
+amount of samples. It stores the average, min, and max for each color. Then, it may adjust the hue borders of the colors to make 
+sure they don't overlap, and for the hue of black and white, it uses the hue average, min, max to make a gaussian distribution, 
+and get a 97.5% CI on one side to disregard possible outliers. 
 
-- weighted majority vote when doing scan intersection
+2. Weighted majority vote when doing scan intersection:
+When it is doing scan intersection, it will first rotate clockwise and scan at every 30 degrees. Then, it will rotate
+counter-clockwise and scan at every 30 degrees. The scan intersection function will take the majority votes for the 4 colors
+around the intersection and return colors for TL, TR, BR, BL.
 __________________________________________________________________________________________________________________________________
 
 Q4. Describe your probability update function in detail and explain how you defined 'agreement' as well as how you 
@@ -52,15 +56,15 @@ The left turning and right turning, after 10-15 times, might diverge from the st
 As such, we tried to minimize the number of turns we have to make before localization and finding the target. 
 __________________________________________________________________________________________________________________________________
 
-TODO:
 Q6. Describe in detail how beliefs are shifted when the robot gets to a boundary. Consider this problem carefully, the correct
     way to handle this is not obvious. Explain clearly what assumptions regarding the robot's motion support your strategy 
     for shifting belief values in this case.
 
-If it hits boundary, 
+If it hits boundary, it will go back and turn right. Every belief will be rotated individually as Q7 specifically explains.
+Then, it will keep driving forward and continues the loop.
 
-we just reverse back so not really shifting beliefs yet?
-The motions after (turn right & drive forward) make beliefs shifted.
+If may also hits the boundary two times, if that happens, the robot will turn right 2 times in total. Thus, every belief will 
+be rotated two times as Q7 specifically explains. Then, it will keep driving forward and continues the loop.
 __________________________________________________________________________________________________________________________________
 
 Q7. Describe in detail how beliefs are shifted when the robot turns 90 degrees (either left or right) without going to a different
@@ -90,10 +94,13 @@ straight driving at the hardware level.
 We also install 2 little drivers for cuteness :D
 __________________________________________________________________________________________________________________________________
 
-TODO: not sure
 Q10. What parameters did you find affect the most the ability of the robot to determine its location?
 
-Sensor calibration, lighting consistency, robot alignment during scans......
+We think that sensors and robot motion control functions affect the most the ability of the robot to determine its location.
+Since we write a simluation script for robot localization, we are very certain that our localization algorithm is correct and
+efficient. However, when we let the robot to do the actual motions that are mocked by the simulation script, the robot sometimes
+perform well while sometimes don't. Therefore, we believe that the sensors and robot motion control functions are the most
+essential part that affect localization a lot.
 __________________________________________________________________________________________________________________________________
 
 Q11. Can external factors (illumination in the room, for example) affect the ability of the robot to find itself?
@@ -102,10 +109,11 @@ Yes!!! The external factors like illumination in the zoom affect the robot's col
 calibrate the robot every time in a new environment.
 __________________________________________________________________________________________________________________________________
 
-TODO:
 Q12. On average, how many intersections does your robot need to visit to achieve successful localization?
 
-Hahaha, I don't know. We haven't tested it yet. (Guess 4-6?)
+We write a simulation for robot localization, and it visits roughly 3-5 intersections until it achieves successful localization.
+However, in our actual robot localization, the color sensor and the robot motion is not very stable. So, it takes much longer time
+for the robot to be certain about where it is.                                                                                                                                                                                                                                          
 __________________________________________________________________________________________________________________________________
 
 Q13. Are there locations in the map that make localization harder? (i.e. does it matter where your robot starts its journey? Why?)
