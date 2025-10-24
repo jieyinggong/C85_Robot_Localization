@@ -1,0 +1,39 @@
+Do you feel this project helped you to understand the following ideas:
+(please answer yes, no, somewhat, and comment on what if anything could have improved your learning experience).
+
+1. The main steps of a robot localization algorithm
+yes
+comment: It's good! I think giving us an example of localization with a known direction in class, and letting us figure out
+a case where the direction is unknown, is challenging but interesting. I don't think there's much to improve this, except maybe 
+extending on this topic a little after all the assignments have been completed.
+
+2. Dealing with real-world sensors
+yes
+comment: Maybe it would be nice if you could've told us where to place the sensors so that it works best, and taught us how
+to build a robot for those of us with no lego/robotics experience. 
+
+3. Dealing with real-world motors and robot motions
+yes
+comment: Maybe you could've explained strategies on how to find the best values for the motors? Because every motor is 
+different, and every move could be different depending on location changes. 
+
+4. Using probabilities to keep track of belief about a robot's position
+yes
+comment: this is perfect. I think the lecture and the lecture notes provided the perfect example -- it's very informative,
+easy to understand, and easy to visualize. 
+
+5. Managing uncertainty (e.g. in the quality of sensor readings, or accuracy of robot motions)
+yes
+comment: I think the learning experience is pretty good, but an extension of this project I'm interested in is 
+if we could do calibration continuously for a changing environment. For example, with color calibration, 
+sometimes the color detection/probability would be inaccurate due to the sun getting temporary blocked by clouds, and then 
+30 seconds later it'll return normal again. 
+
+6. Do you feel confident you could implement a probabilistic localization algorithm for a more complex robot,
+   working in a real world environment? (please explain your answer)
+somewhat
+comment: This is hard enough D: . Real world is much more complicated than some colors on a map unfortunately, and there are 
+more than 4 directions a robot could face. 
+
+7. Any other comments regarding your experience with this project?
+It's difficult, but fun! Love this course. I need 16 hours of sleep after this. 

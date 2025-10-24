@@ -1,6 +1,0 @@
-Color 0 average RGB = (179, 136, 155)
-Color 1 average RGB = (659, 605, 686)
-Color 2 average RGB = (704, 252, 231)
-Color 3 average RGB = (626, 553, 226)
-Color 4 average RGB = (307, 344, 260)
-Color 5 average RGB = (327, 349, 565)

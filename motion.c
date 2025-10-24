@@ -1,37 +1,86 @@
 #include "./EV3_RobotControl/btcomm.h"
-#include "intersection.h"
-#include <unistd.h>  // Required for usleep
+#include "motion.h"
+#include <unistd.h>
 #include <stdbool.h>
-#include <math.h>   // Required for fmod
+#include <math.h>
 #include "const.h"
 
 #define DEG_STEP   15.0      
 #define WINDOW     5.0     
 #define N_SAMPLES  24   
 
-int detect_intersectionc(void)
+void recorrect_to_black_internal(int depth);
+int find_alternate_street(void);
+
+#define HISTORY_SIZE 6       
+#define MIN_VOTE 3           
+#define MIN_STABLE 3         
+
+int detect_intersection(void)
 {
- /*
-  * This function attempts to detect if the bot is currently over an intersection. You can implement this in any way
-  * you like, but it should be reliable and robust.
-  * 
-  * The return value should be 1 if an intersection is detected, and 0 otherwise.
-  */   
-  int R, G, B, A;
-  if (BT_read_colour_RGBraw_NXT(C_YELLOW, &R, &G, &B, &A) == 1) {
-    fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
-    int color = classify_color_hsv(R, G, B, A);
-    if (color == 3) { // Yellow
-      fprintf(stderr, "Detected intersection (Yellow)\n");
-      return 1;
-    } else {
-      fprintf(stderr, "Not an intersection\n");
-      return 0;
+    static int color_history[HISTORY_SIZE] = { C_BLACK }; 
+    static int idx = 0;
+
+    int R, G, B, A, color = C_BLACK;
+    if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) != 1) {
+        fprintf(stderr, "[detect] Sensor read failed.\n");
+        return -1;
     }
-  } else {
-    fprintf(stderr, "Failed to read NXT color sensor (RGB raw).\n");
-    return 0;
-  }
+
+    color = classify_color_hsv(R, G, B, A);
+
+    color_history[idx] = color;
+    idx = (idx + 1) % HISTORY_SIZE;
+
+    //majority vote
+    int count_black = 0, count_yellow = 0, count_red = 0, count_other = 0;
+    for (int i = 0; i < HISTORY_SIZE; i++) {
+        switch (color_history[i]) {
+            case C_BLACK: count_black++; break;
+            case C_YELLOW: count_yellow++; break;
+            case C_RED: count_red++; break;
+            case C_UNKNOWN: {
+               // count_other++; 
+                //count_black++;
+                break;
+            }; // treat unknown as black
+            default: count_other++; break;
+        }
+    }
+
+    int current_result = 3; 
+    if (count_yellow >= 2) {
+        for (int i = 0; i < HISTORY_SIZE; i++) {
+            color_history[i] = C_BLACK;
+        }
+        fprintf(stderr, "[detect] Yellow detected, resetting history with yellow count = %d.\n", count_yellow);
+        current_result = 1;
+
+    } else if (count_red >= MIN_VOTE) {
+        current_result = 2;
+    }
+    else if (count_black >= MIN_VOTE) current_result = 0;
+//    else current_result = 0;
+
+    
+
+    // check stable
+    // if (current_result == last_result)
+    //     stable_count++;
+    // else
+    //     stable_count = 1;
+
+    // if (stable_count >= MIN_STABLE && current_result != last_result) {
+    //     fprintf(stderr,
+    //         "[detect] Stable transition %d → %d (Y=%d, R=%d, B=%d)\n",
+    //         last_result, current_result, count_yellow, count_red, count_black);
+    //     last_result = current_result;
+    //     stable_count = 0;
+    // }
+    // return last_result;
+
+    return current_result;
+
 }
 
 int detect_intersection_or_street(void){
@@ -39,7 +88,7 @@ int detect_intersection_or_street(void){
   if (BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A) == 1) {
     fprintf(stderr, "RGB values: R=%d, G=%d, B=%d, A=%d\n", R, G, B, A);
     int color = classify_color_hsv(R, G, B, A);
-    if (color == 1 || color == 5) { // Yellow
+    if (color == C_BLACK || color == C_YELLOW) {
       fprintf(stderr, "Detected intersection (Yellow) or Street (Black)\n");
       return 1;
     } else {
@@ -90,7 +139,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
     sleep(1); // Wait a moment for the gyro to stabilize
     // drive forwarde to the start point of scan
     BT_timed_motor_port_start(LEFT_MOTOR, 7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
-    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 120, 1380, 100); // Start motor C with power 6, ramp up time 500ms
+    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 120, 1400, 100); // Start motor C with power 6, ramp up time 500ms
    // BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
     fprintf(stderr, "Drive forward to start point of scan.\n");
     sleep(3); // Wait for the bot to reach the start point
@@ -352,7 +401,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                     total_votes += color_vote[region][color];
                 }
 
-                if (region_color[region] == C_OTHER || (unknown_votes / total_votes > 0.5)) {
+                if (region_color[region] == C_UNKNOWN || (unknown_votes / total_votes > 0.5)) {
                     fprintf(stderr, "Region %d has unknown color or over 50%% unknown votes. Performing specified check...\n", region);
 
                     // Calculate average angle for unknown color in this region
@@ -418,7 +467,7 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
 
                     // Recalculate the final color for this region
                     double max_votes = 0;
-                    int best_color = C_OTHER; // Default to UNKNOWN
+                    int best_color = C_UNKNOWN; // Default to UNKNOWN
                     for (int color = 0; color < 7; ++color) {
                         if ((color == C_BLUE || color == C_GREEN || color == C_WHITE) && color_vote[region][color] > max_votes) {
                             max_votes = color_vote[region][color];
@@ -455,10 +504,17 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
                 fprintf(stderr, "Failed to read gyro sensor for final angle adjustment.\n");
             }
 
-        BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1400, 100);
-        BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1380, 100);
+        //BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1400, 100);
+       // BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1380, 100);
 
-        sleep(2); // Wait for the bot to return to original position
+        //sleep(2); // Wait for the bot to return to original position
+
+        BT_timed_motor_port_start(LEFT_MOTOR, -7, 100, 1400, 80); // Start motor A with power 7, ramp up time 500ms, run time 1400ms, ramp down time 80ms
+    BT_timed_motor_port_start(RIGHT_MOTOR, -6, 120, 1400, 100); // Start motor C with power 6, ramp up time 500ms
+   //BT_motor_port_stop(MOTOR_A | MOTOR_D, 1);  // Stop motors A and B with active brake
+   // fprintf(stderr, "Drive forward to start point of scan.\n");
+    sleep(3); // Wait for the bot to reach the start point
+   
         fprintf(stderr, "Scan complete.\n");
 
     // Return invalid colour values, and a zero to indicate failure (you will replace this with your code)
@@ -466,6 +522,8 @@ int scan_intersection(int *tl, int *tr, int *br, int *bl)
     *(tr)=region_color[0];
     *(br)=region_color[1];
     *(bl)=region_color[2];
+
+
 
     return 1; // success
  
@@ -482,11 +540,11 @@ int leftright_turn_degrees(int direction, double target_angle){
 
     BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 600, 80);
     BT_timed_motor_port_start(RIGHT_MOTOR, 6, 80, 600, 80);
-    usleep(1000);
+    sleep(1); // Wait a moment for the gyro to stabilize
 
     if (direction == 1) {
         /* Turn right */
-         BT_turn(LEFT_MOTOR, 15, RIGHT_MOTOR, -10);
+         BT_turn(LEFT_MOTOR, 14, RIGHT_MOTOR, -10);
         /* Monitor until angle reaches about +90 degrees */
         while (angle < target_angle - 0.5) {
             if (BT_read_gyro(GYRO_PORT, 0, &angle, &rate) != 1) {
@@ -518,14 +576,435 @@ int turn_right_90_degrees(){
 }
 
 int turn_back_180_degrees(){
-    return leftright_turn_degrees(1,180.0);
+    
+    leftright_turn_degrees(1,90.0);
+
+    BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1200, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, -6, 80, 1200, 80);
+    sleep(1); // Wait a moment for the gyro to stabilize
+
+    leftright_turn_degrees(1,90.0);
+
+    return 1;
+    
 }
 
 int turn_left_90_degrees(){
     return leftright_turn_degrees(-1,90.0);
 }
 
-int back_to_intersection(){
+int drive_along_street(int dir, int* border_flag)
+{
+ /*
+  * This function drives your bot along a street, making sure it stays on the street without straying to other pars of
+  * the map. It stops at an intersection.
+  * 
+  * You can implement this in many ways, including a controlled (PID for example), a neural network trained to track and
+  * follow streets, or a carefully coded process of scanning and moving. It's up to you, feel free to consult your TA
+  * or the course instructor for help carrying out your plan.
+  * 
+  * You can use the return value to indicate success or failure, or to inform the rest of your code of the state of your
+  * bot after calling this function.
+  */   
+
+  // Test driving forward
+  fprintf(stderr, "Starting drive_along_street (dir=%d)\n", dir);
+
+  int started = 0;
+
+  while (1) {
+    int detected = detect_intersection();
+     if (detected == 2) {
+        if (border_flag != NULL && *border_flag <= 0){
+            dir = -dir;
+        }
+      (*border_flag)++;
+    }
+
+    if (detected == 0) {
+        if (!started) {
+            fprintf(stderr, "On the street, starting to drive forward...\n");
+            started = 1;
+            BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 6, dir * 5);
+        }
+      continue;
+    }
+
+    BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    //   // Double-check: small back, return, small forward, return.
+    //   int R = 0, G = 0, B = 0, A = 0;
+    //   int c_back = -1, c_forward = -1;
+
+    //   // Step back a little
+    //   BT_timed_motor_port_start(LEFT_MOTOR, -8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, -7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    //   BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+    //   c_back = classify_color_hsv(R, G, B, A);
+
+    //   // Return to original position
+    //   BT_timed_motor_port_start(LEFT_MOTOR, 8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, 7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+    //   // Step forward a little
+    //   BT_timed_motor_port_start(LEFT_MOTOR, 8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, 7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    //   BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+    //   c_forward = classify_color_hsv(R, G, B, A);
+
+    //   // Return to original position again
+    //   BT_timed_motor_port_start(LEFT_MOTOR, -8, 80, 500, 80);
+    //   BT_timed_motor_port_start(RIGHT_MOTOR, -7, 100, 500, 100);
+    //   sleep(1);
+    //   BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+    //   fprintf(stderr, "Double-check: back=%d forward=%d\n", c_back, c_forward);
+
+    //   // If both checks indicate street (treat YELLOW as street too), resume as if on black
+    //   if ((c_back == C_BLACK || c_back == C_YELLOW || c_back == C_RED) &&
+    //       (c_forward == C_BLACK || c_forward == C_YELLOW || c_forward == C_RED)) {
+    //       fprintf(stderr, "Double-check confirms street — resuming drive.\n");
+    //       if (!started) {
+    //           started = 1;
+    //           BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 6, dir * 5);
+    //       }
+    //       continue;
+    //   }
+
+    if (detected == 1) {
+      fprintf(stderr, "Intersection detected. Stopping.\n");
+      return 1;
+    }
+
+    if (detected == 2) {
+      fprintf(stderr, "Border detected! Backing up. (count=%d)\n", *border_flag);
+
+      BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 8, dir * 7);
+      sleep(1);
+      BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+      started = 0;
+      continue;  // retry main loop
+    }
+
+    if (detected == 3) {
+      fprintf(stderr, "Minor deviation detected. Correcting...\n");
+      micro_swing_correction(8, dir);
+      started = 0;
+      continue;
+    }
+    usleep(20000); // 10 ms
+  }
+
+  return 1;
+}
+
+
+void verify_and_recorrect_internal(int depth)
+{
+    int R = 0, G = 0, B = 0, A = 0;
+    int color_forward = -1, color_backward = -1;
+
+    printf("[Verify #%d] Checking color consistency around final position...\n", depth);
+
+    // forward
+    BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 1000, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 1000, 100);
+    sleep(2);
+    BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+    color_forward = classify_color_hsv(R, G, B, A);
+    printf("[Verify #%d] Forward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_forward, R, G, B, A);
+
+    // back
+    BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1000, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1000, 100);
+    sleep(2);
+
+    BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1000, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1000, 100);
+    sleep(2);
+
+    BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, 1000, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, 1000, 100);
+    sleep(2);
+    
+    BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+    color_backward = classify_color_hsv(R, G, B, A);
+    printf("[Verify #%d] Backward color = %d (R=%d,G=%d,B=%d,A=%d)\n", depth, color_backward, R, G, B, A);
+    BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 1000, 80);
+    BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 1000, 100);
+    sleep(2);
+
+    // If either reading is not black/yellow, or they disagree, do another correction
+    if (!(color_forward == C_BLACK && color_backward == C_BLACK) &&
+        !(color_forward == C_YELLOW && color_backward == C_YELLOW) &&
+        !(color_forward == C_BLACK && color_backward == C_YELLOW) &&
+        !(color_forward == C_YELLOW && color_backward == C_BLACK))
+    {
+        printf("[Verify #%d] Not stable — re-correction triggered.\n", depth);
+         BT_turn(LEFT_MOTOR, 0, RIGHT_MOTOR, 10);
+         sleep(1);
+          BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+        if (depth < 5) // limit max recursion depth
+        {
+            recorrect_to_black_internal(depth + 1);
+        }
+        else
+        {
+            printf("[Verify] Max recursion depth reached, stopping further correction.\n");
+            // if (find_alternate_street()) {
+            //     recorrect_to_black();
+            // }    
+        }
+    }
+    else
+    {
+        printf("[Verify #%d] Both sides confirmed on black — correction stable.\n", depth);
+    }
+}
+
+void recorrect_to_black_internal(int depth)
+{
+    int R = 0, G = 0, B = 0, A = 0;
+    int color = -1;
+    int angle = 0, rate = 0;
+    const int BASE_TIME = 1500;
+    const double GYRO_SCALE = 1.0 / 60.0;
+
+    printf("[Correction #%d] Starting adaptive correction loop...\n", depth);
+
+    BT_read_gyro(GYRO_PORT, 1, &angle, &rate);
+
+    while (1)
+    {
+        BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+        color =classify_color_hsv(R, G, B, A);
+
+        if (color == C_BLACK || color == C_YELLOW)
+        {
+            printf("[Correction #%d] Reacquired black line.\n", depth);
+            BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+            break;
+        }
+
+        printf("[Correction #%d] Off street (color=%d) — correcting.\n", depth, color);
+
+        // Backward (angle compensation)
+        BT_read_gyro(GYRO_PORT, 0, &angle, &rate);
+        double theta_b = fabs(angle);
+        if (theta_b > 180) theta_b = 360 - theta_b;  // wrap to [0,180]
+        double theta_rad_b = theta_b * M_PI / 180.0;
+        double back_factor = 1.0 + sin(theta_rad_b) * GYRO_SCALE;
+        int back_time = (int)(BASE_TIME * back_factor);
+
+        BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, back_time, 80);
+        BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, back_time, 100);
+        sleep(3);
+        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+        // Rotate
+        BT_read_gyro(GYRO_PORT, 1, &angle, &rate);
+        int dir = 1;
+        BT_turn(LEFT_MOTOR, 0, RIGHT_MOTOR, 10 * dir);
+        sleep(1);
+        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+        // Forward (angle compensation)
+        BT_read_gyro(GYRO_PORT, 0, &angle, &rate);
+        double theta_f = fabs(angle);
+        if (theta_f > 180) theta_f = 360 - theta_f;  // wrap to [0,180]
+        double theta_rad_f = theta_f * M_PI / 180.0;
+        double fwd_factor = 1.0 + sin(theta_rad_f) * GYRO_SCALE;
+        int fwd_time = (int)(BASE_TIME * fwd_factor);
+        BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, fwd_time, 80);
+        BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, fwd_time, 100);
+        sleep(3);
+        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+        sleep(1);
+    }
+
+    printf("[Correction #%d] Completed — back on street.\n", depth);
+    verify_and_recorrect_internal(depth); 
+  }
+ 
+void recorrect_to_black(void)
+{
+    recorrect_to_black_internal(1);
+}
+
+
+int find_street(int dir)
+{
+    int color = -1;
+    int outcome = 0;
+
+    srand(time(NULL));  // random seed once
+
+    int R, G, B, A;
+    BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+    color =classify_color_hsv(R, G, B, A);
+    printf("First Color detected with RGB(%d, %d, %d, %d): %d\n", R, G, B, A, color);
+    sleep(1);
+    if (color == C_BLACK) // Black
+    {
+        printf("Street found!\n");
+        return 1;
+    }
+
+    while (1)
+    {
+        // Read color sensor
+        int R, G, B, A;
+        BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+        color =classify_color_hsv(R, G, B, A);
+        printf("Color detected: %d\n", color);
+
+        if (color == C_BLACK) // Black
+        {
+        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+        printf("Street found!\n");
+        outcome = 1;
+        break;
+        }
+
+        // // Detect red (border)
+        // if (color == C_RED)
+        // {
+        //     printf("Border detected! Backing up...\n");
+        //     BT_drive(LEFT_MOTOR, RIGHT_MOTOR, -24, -20);
+        //     sleep(3);
+        //     BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+
+        //     // Turn away from border
+        //     int angle = (rand() % 120) + 60; // 60°–180° turn
+        //     int dir = (rand() % 2) ? 1 : -1; // random left/right
+        //     BT_turn(LEFT_MOTOR, 30 * dir, RIGHT_MOTOR, -30 * dir);
+        //     sleep(3); // crude rotation timing
+        //     BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+        //     continue;
+        // }
+
+        // Keep moving forward in small steps
+        BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir * 10, 0);
+        sleep(1);
+        BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    }
+
+    return outcome;
+}
+
+int find_alternate_street(void)
+{
+
+    leftright_turn_degrees(1, 120);   
+    BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+    sleep(1);
+
+    int result = find_street(-1);
+    if (result)
+        printf("[Reacquire] Found new street successfully!\n");
+    else
+        printf("[Reacquire] No street found after rotation.\n");
+
+    return result;
+}
+
+
+void micro_swing_correction(int rotate_power, int dir)
+{
+    int R = 0, G = 0, B = 0, A = 0;
+    int color = -1;
+    int angle = 0, rate = 0;
+    const int MAX_SWING = 4;       
+    const int STEP_TIME = 500;     
+
+    printf("[MicroCorrection] Starting small fan-sweep correction...\n");
+
+    int swing_dir = 1;           
+    int swing_count = 0;   
+
+    BT_read_gyro(GYRO_PORT, 0, &angle, &rate);
+
+    while (swing_count < MAX_SWING * 2)
+    {   
+        int time = (int)(STEP_TIME * (1.0 + 0.6 * swing_count));
+
+        if (swing_dir == 1){
+            BT_timed_motor_port_start(RIGHT_MOTOR, dir *10, 100, time, 100);
+            BT_timed_motor_port_start(LEFT_MOTOR, -7*dir, 100, time, 100);
+        }
+        else{
+             BT_timed_motor_port_start(LEFT_MOTOR,  11*dir, 100, time, 100);
+              BT_timed_motor_port_start(RIGHT_MOTOR, -7*dir, 100, time, 100);
+        }
+        usleep(1010*(time+500));
+
+        BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+        color = classify_color_hsv(R, G, B, A);
+        printf("[MicroCorrection] Swing #%d dir=%d color=%d with time %d\n", swing_count, dir, color, time);
+
+        if (color == C_BLACK || color ==  C_YELLOW || color == C_RED)
+        {
+            printf("[MicroCorrection] Street line reacquired — stopping.\n");
+            if (color == C_YELLOW){
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+                break;
+            }
+                BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir*8, dir*7);
+                sleep(1);
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
+            BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+            break;
+        }
+
+         if (swing_dir == 1){
+            BT_timed_motor_port_start(RIGHT_MOTOR,  -10*dir, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(LEFT_MOTOR,  7*dir, 100, time * 0.9, 100);
+
+        }
+        else{
+             BT_timed_motor_port_start(LEFT_MOTOR,  -11*dir, 100, time * 0.9, 100);
+             BT_timed_motor_port_start(RIGHT_MOTOR,  7*dir, 100, time * 0.9, 100);
+        }
+        usleep(1010*(time+500));
+
+        BT_read_colour_RGBraw_NXT(COLOR_PORT, &R, &G, &B, &A);
+        color = classify_color_hsv(R, G, B, A);
+        // printf("[MicroCorrection] Swing #%d dir=%d color=%d with time %d\n", swing_count, dir, color, time);
+
+        if (color == C_BLACK || color == C_YELLOW || color == C_RED)
+        {   
+            if (color == C_YELLOW){
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+                break;
+            }
+            printf("[MicroCorrection] Street line reacquired — stopping.\n");
+                BT_drive(LEFT_MOTOR, RIGHT_MOTOR, dir *8, dir*7);
+                sleep(1);
+                BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);  // Stop motors A and B with active brake
+            BT_motor_port_stop(LEFT_MOTOR | RIGHT_MOTOR, 1);
+            break;
+        }
+
+        
+
+        swing_dir = -swing_dir;
+        swing_count++;
+
+       usleep(100000);
+    }
+
+    printf("[MicroCorrection] Completed small fan-sweep correction.\n");
+}
+
+
+int correct_to_intersection(){
     // Check if the bot is on an intersection
   if (!detect_intersection_or_street()) {
     fprintf(stderr, "Not on an intersection, adjusting position...\n");
@@ -536,17 +1015,17 @@ int back_to_intersection(){
 
     double time = 800+adjustment_attempts*100; // increase time for each attempt
       // back
-      BT_timed_motor_port_start(MOTOR_A, -7, 80, time, 80);
-      BT_timed_motor_port_start(MOTOR_D, -6, 100, time, 100);
+      BT_timed_motor_port_start(LEFT_MOTOR, -7, 80, time, 80);
+      BT_timed_motor_port_start(RIGHT_MOTOR, -6, 100, time, 100);
       sleep(2);
 
       if (detect_intersection_or_street()) {
         fprintf(stderr, "Intersection or street found after backward adjustment.\n");
         break;
-      }
+      };
       // forward
-      BT_timed_motor_port_start(MOTOR_A, 7, 80, time, 80);
-      BT_timed_motor_port_start(MOTOR_D, 6, 100, time, 100);
+      BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, time, 80);
+      BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, time, 100);
       sleep(2);
       if (detect_intersection_or_street()) {
         fprintf(stderr, "Intersection or street found after forward adjustment.\n");

@@ -59,8 +59,8 @@ code that you have to complete in order to implement the localization algorithms
 */
 
 
-#ifndef __localization_header
-#define __localization_header
+#ifndef __localization_sim_header
+#define __localization_sim_header
 
 #include<stdio.h>
 #include<stdlib.h>

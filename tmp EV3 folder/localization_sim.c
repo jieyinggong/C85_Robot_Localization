@@ -86,7 +86,7 @@
  
 */
 
-#include "EV3_Localization.h"
+#include "localization_sim.h"
 #include "calibration.h"
 #include <math.h>
 #include <stdlib.h>
@@ -95,7 +95,6 @@
 #include <string.h>
 #include "EV3_RobotControl/btcomm.h"
 #include "const.h"
-#include "btcomm.h"
 
 #define MIN_SCANS_TO_CONFIRM 3
 #define CERTAINTY_THRESHOLD  0.80
@@ -104,16 +103,58 @@
 #define NAV_CERTAINTY_THRESHOLD  0.65
 #define NAV_SCAN_EVERY_STEPS     1
 
-int map[400][4];            // This holds the representation of the map, up to 20x20
+int map[15][4];            // This holds the representation of the map, up to 20x20
                             // intersections, raster ordered, 4 building colours per
                             // intersection.
 int sx, sy;                 // Size of the map (number of intersections along x and y)
-double beliefs[400][4];     // Beliefs for each location and motion direction
+double beliefs[15][4];     // Beliefs for each location and motion direction
 
 HSVRange ranges[COLOR_COUNT]; // global variable to hold calibration data
 ColorProbability color_probabilities[COLOR_COUNT]; // global variable to hold color probabilities
 
-// helper functions
+void scan_intersection_sim(int *tl, int *tr, int *br, int *bl);
+void execute_move_sim(int *hit_count);
+int sim_counter = 0;
+int SIM_COUNT = 13;
+
+// route 1
+// int execute_sim[] = {0, 0, 0, 0, 1, 0, 1, 0};
+// int color_sim[][4] = {
+//   {C_BLUE, C_WHITE, C_GREEN, C_BLUE},
+//   {C_GREEN, C_WHITE, C_BLUE, C_WHITE},
+//   {C_GREEN, C_BLUE, C_GREEN, C_WHITE},
+//   {C_BLUE, C_WHITE, C_GREEN, C_WHITE},
+//   {C_GREEN, C_WHITE, C_BLUE, C_WHITE},
+// 
+//   {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
+//   {C_WHITE, C_GREEN, C_WHITE, C_BLUE}, 
+// 
+//   {C_BLUE, C_BLUE, C_WHITE, C_GREEN}
+// };
+
+// route 2
+int execute_sim[] = {2, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1};
+int color_sim[][4] = {
+  {C_WHITE, C_GREEN, C_WHITE, C_BLUE},
+  
+  {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
+  {C_WHITE, C_GREEN, C_WHITE, C_BLUE}, 
+
+  {C_BLUE, C_BLUE, C_WHITE, C_GREEN}, 
+  {C_GREEN, C_WHITE, C_GREEN, C_BLUE},
+  {C_GREEN, C_BLUE, C_BLUE, C_WHITE},
+  {C_BLUE, C_BLUE, C_WHITE, C_GREEN},
+
+  {C_WHITE, C_BLUE, C_WHITE, C_GREEN}, 
+  {C_BLUE, C_BLUE, C_WHITE, C_GREEN}, 
+
+  {C_GREEN, C_WHITE, C_BLUE, C_WHITE},
+  {C_GREEN, C_BLUE, C_GREEN, C_WHITE},
+  {C_BLUE, C_WHITE, C_GREEN, C_WHITE},
+  {C_GREEN, C_WHITE, C_BLUE, C_WHITE}
+
+};
+
 static inline int idx_to_x(int idx){ return idx % sx; }
 static inline int idx_to_y(int idx){ return idx / sx; }
 static inline int xy_to_idx(int x,int y){ return x + y*sx; }
@@ -146,36 +187,7 @@ static void current_argmax(int* bestIdx, int* bestDir, double* bestVal){
   }
 }
 
-static void execute_move(int *hit_count) {
-  int border_flag = 0;
-  BT_timed_motor_port_start(LEFT_MOTOR, 8, 100, 1500, 80);
-  BT_timed_motor_port_start(RIGHT_MOTOR, 7, 120, 1500, 100);
-  sleep(3);
-  while (*hit_count < 2) {
-    int res = drive_along_street(1, &border_flag);
-    if (res == 1 && border_flag == 0) {
-      break;
-    } 
-    else if (border_flag > 0) {
-      (*hit_count)++;
-      turn_right_90_degrees();
-        BT_timed_motor_port_start(LEFT_MOTOR, 8, 100, 1500, 80);
-        BT_timed_motor_port_start(RIGHT_MOTOR, 7, 120, 1500, 100);
-        sleep(3);
-      border_flag = 0;
-      continue;
-    }
-    sleep(1);
-  }
-}
-
-
 static inline void expected_corners_for_dir(int idx, int dir, int out4[4]){
-  // map[idx] = [TL, TR, BR, BL] (clockwise)
-  // up: expect = [TL, TR, BR, BL]
-  // right: expect = [TR, BR, BL, TL]
-  // down: expect = [BR, BL, TL, TR]
-  // left: expect = [BL, TL, TR, BR]
   int base[4] = { map[idx][0], map[idx][1], map[idx][2], map[idx][3] };
   for(int k=0;k<4;k++){
     out4[k] = base[(k + dir) & 3];
@@ -183,7 +195,7 @@ static inline void expected_corners_for_dir(int idx, int dir, int out4[4]){
 }
 
 static inline double get_color_hit_prob(int c){
-  if (c != C_WHITE && c != C_GREEN && c != C_BLUE) return 0.85;
+  if (c < 1 || c > 6) return 0.85;
   double p = color_probabilities[c].probability;
   if (p < 0.55) p = 0.55;
   if (p > 0.99) p = 0.99;
@@ -195,7 +207,7 @@ static inline int is_allowed_corner_colour(int c){
 }
 
 static inline double sensor_likelihood_4(const int readings[4], const int expect[4]){
-  const double p_unknown = 0.30;
+  const double p_unknown = 0.50;
 
   double p_total = 1.0;
 
@@ -242,13 +254,12 @@ void updateBelief(int readings[4])
       beliefs[idx][dir] *= pz;
     }
   }
+
   normalize_beliefs();
 }
 
-// copy current beliefs into the relative "forward" intersections' beliefs for every 4 directions respectively
 void actionModel()
 {
-  // update beliefs
   int dx[4] = {0, 1, 0, -1};
   int dy[4] = {-1, 0, 1, 0};
   double newBeliefs[15][4];
@@ -268,14 +279,15 @@ void actionModel()
     }
   }
   memcpy(beliefs, newBeliefs, sizeof(newBeliefs));
+  // normalize beliefs
   normalize_beliefs();
 }
 
 void rotateBeliefsRight()
 {
   // for every individual beliefs [up, right, down, left], rotate them one unit to the right: i.e., [left, up, right, down]
-  static double newBeliefs[400][4];
-  for (int idx = 0; idx < 400; idx++) {
+  static double newBeliefs[15][4];
+  for (int idx = 0; idx < sx*sy; idx++) {
     newBeliefs[idx][0] = beliefs[idx][3];
     newBeliefs[idx][1] = beliefs[idx][0];
     newBeliefs[idx][2] = beliefs[idx][1];
@@ -289,14 +301,14 @@ int main(int argc, char *argv[])
  char mapname[1024];
  int dest_x, dest_y, rx, ry;
  unsigned char *map_image;
- 
- memset(&map[0][0],0,400*4*sizeof(int));
+
+ memset(map, 0, sizeof(map));
  sx=0;
  sy=0;
  
  if (argc<4)
  {
-  fprintf(stderr,"Usage: ./ev3_robot Map1.ppm dest_x dest_y\n");
+  fprintf(stderr,"Usage: EV3_Localization map_name dest_x dest_y\n");
   fprintf(stderr,"    map_name - should correspond to a properly formatted .ppm map image\n");
   fprintf(stderr,"    dest_x, dest_y - target location for the bot within the map, -1 -1 calls calibration routine\n");
   exit(1);
@@ -305,27 +317,27 @@ int main(int argc, char *argv[])
  dest_x=atoi(argv[2]);
  dest_y=atoi(argv[3]);
 
-  // Open a socket to the EV3 for remote controlling the bot.
- if (BT_open(HEXKEY)!=0)
- {
-  fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
-  fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
-  free(map_image);
-  exit(1);
- }
+// Open a socket to the EV3 for remote controlling the bot.
+  if (BT_open(HEXKEY)!=0)
+  {
+    fprintf(stderr,"Unable to open comm socket to the EV3, make sure the EV3 kit is powered on, and that the\n");
+    fprintf(stderr," hex key for the EV3 matches the one in EV3_Localization.h\n");
+    free(map_image);
+    exit(1);
+  }
 
- if (dest_x==-1&&dest_y==-1)
- {
-  calibrate_sensor();
-  exit(1);
- }
+  if (dest_x==-1&&dest_y==-1)
+  {
+    calibrate_sensor();
+    exit(1);
+  }
 
  /******************************************************************************************************************
   * OPTIONAL TO DO: If you added code for sensor calibration, add just below this comment block any code needed to
   *   read your calibration data for use in your localization code. Skip this if you are not using calibration
   * ****************************************************************************************************************/
-  read_color_calibration(ranges);
-  read_color_probability(color_probabilities);
+  // read_color_calibration(ranges);
+  // read_color_probability(color_probabilities);
   
  // Your code for reading any calibration information should not go below this line //
  
@@ -359,15 +371,6 @@ int main(int argc, char *argv[])
    beliefs[i+(j*sx)][2]=1.0/(double)(sx*sy*4);
    beliefs[i+(j*sx)][3]=1.0/(double)(sx*sy*4);
   }
-
-  int TONE_LOCALIZATION_DONE[50][3] = {
-  {392,180,45},   // G4
-  {523,180,50},   // C5
-  {659,180,55},   // E5
-  {784,220,60},   // G5 (octave)
-  {1047,400,63},  // C6 (bright finale)
-  {-1,-1,-1}
-  };
 
  fprintf(stderr,"All set, ready to go!\n");
  
@@ -409,12 +412,16 @@ int main(int argc, char *argv[])
 
  // HERE - write code to call robot_localization() and go_to_target() as needed, any additional logic required to get the
  //        robot to complete its task should be here.
+  // printf("Turn left 90 degrees\n"); 
+  // turn_left_90_degrees();
+
+  // printf("Turn right 90 degrees\n"); 
+  // turn_right_90_degrees();
+// 
  
  int robot_x = -1;
  int robot_y = -1;
  int direction = 0;
- robot_localization(&robot_x, &robot_y, &direction);
- fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
  int success = robot_localization(&robot_x, &robot_y, &direction);
  if (success) {
   fprintf(stderr, "Localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
@@ -426,24 +433,27 @@ int main(int argc, char *argv[])
         beliefs[idx][0], beliefs[idx][1], beliefs[idx][2], beliefs[idx][3]);
     }
   }
-  } else {
-   fprintf(stderr, "Localization failed! Robot could not determine its location.\n");
-  }
-
-  success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
-  while (!success) {
+  free(map_image);
+  exit(0);
+ } else {
+  fprintf(stderr, "Localization failed! Robot could not determine its location.\n");
+  free(map_image);
+  exit(1);
+ }
+ success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
+ while (!success) {
     // re-localize
     success = robot_localization(&robot_x, &robot_y, &direction);
     fprintf(stderr, "Re-localization complete! Robot at (%d, %d) facing %d\n", robot_x, robot_y, direction);
     success = go_to_target(robot_x, robot_y, direction, dest_x,  dest_y);
-  }
-  fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
-  BT_play_tone_sequence(TONE_LOCALIZATION_DONE);
+ }
+ fprintf(stderr, "Arrived at target (%d, %d)!\n", dest_x, dest_y);
+ // TODO: robot can do something cool to show mission complete! like dance (keep 360% crazy rotating & playing a song)
 
-  // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
-  BT_close();
-  free(map_image);
-  exit(0);
+ // Cleanup and exit - DO NOT WRITE ANY CODE BELOW THIS LINE
+ // BT_close();
+ free(map_image);
+ exit(0);
 }
 
 int turn_at_intersection(int turn_direction)
@@ -527,28 +537,17 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
   /************************************************************************************************************************
    *   TO DO  -   Complete this function
    ***********************************************************************************************************************/
-  // init to find street and intersection
-  // find_street(1);
-  // BT_timed_motor_port_start(LEFT_MOTOR, 7, 80, 1200, 80);
-  // BT_timed_motor_port_start(RIGHT_MOTOR, 6, 100, 1200, 100);
-  // sleep(2);
-  // recorrect_to_black();
-  int border_flag = 0;
-  drive_along_street(1, &border_flag);
-  sleep(1);
-
-  // random seed for action selection
+  // fandom seed for action selection
   srand((unsigned int)time(NULL));
 
   int scans = 0;
-  
-  // test: assume start at a intersection
 
   while (1)
   {
     // 1) Sense: scan 4 corners and do sensor (measurement) update
     int tl,tr,br,bl;
-    scan_intersection(&tl,&tr,&br,&bl);
+    // scan_intersection(&tl,&tr,&br,&bl);
+    scan_intersection_sim(&tl,&tr,&br,&bl);
     int z[4] = {tl,tr,br,bl};
 
     updateBelief(z);
@@ -567,10 +566,25 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
       break;
     }
 
+    double max = -1.0;
+    int found_idx = -1;
+    int found_dir = -1;
+    for (int i = 0; i < sx*sy; i++) {
+      for (int j = 0; j < 4; j++) {
+        // printf("%.2f ", beliefs[i][j]);
+        if (beliefs[i][j] > max) {
+          max = beliefs[i][j];
+          found_idx = i;
+          found_dir = j;
+        }
+      }
+    }
+    printf("Max belief value: %f at idx %d dir %d\n", max, found_idx, found_dir);
+
     // 3) *Motion Step* Always drive forward to next intersection until red border is detected
     //    If red border is detected, always turn right then drive forward to next intersection
     int hit_count = 0;
-    execute_move(&hit_count);
+    execute_move_sim(&hit_count);
     
     // 4) Update beliefs (and normalize)
     //    Case 1 - If only drive forward, update beliefs (*shift* beliefs forward for every four direction)
@@ -580,13 +594,16 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
     //             turn right again & drive forward, update beliefs (first: *rotate* individual beliefs two times to right,
     //             second: do case 1 - *shift* beliefs forward for every four direction)
     if (hit_count == 0) {
+      printf("No red border detected, drive forward\n");
       actionModel();
     }
     else if (hit_count == 1) {
+      printf("Red border detected once, turn right & drive forward\n");
       rotateBeliefsRight();
       actionModel();
     }
     else if (hit_count == 2) {
+      printf("Red border detected twice, turn right twice & drive forward\n");
       rotateBeliefsRight();
       rotateBeliefsRight();
       actionModel();
@@ -595,6 +612,47 @@ int robot_localization(int *robot_x, int *robot_y, int *direction)
 
  // Localization succeeded (we broke out of the loop when confident)
  return 1;
+}
+
+void execute_move_sim(int *hit_count)
+{
+  // This is a simulated version of execute_move for testing purposes only
+  *hit_count = execute_sim[sim_counter++];
+  printf("Simulated execute move, hit_count=%d\n", *hit_count);
+
+  if (sim_counter >= SIM_COUNT) {
+   printf("Simulation complete\n");
+ 
+    double max = -1.0;
+    for (int i = 0; i < 15; i++) {
+      for (int j = 0; j < 4; j++) {
+        printf("%.4f ", beliefs[i][j]);
+        if (beliefs[i][j] > max) {
+          max = beliefs[i][j];
+        }
+      }
+      printf("\n");
+    }
+    printf("Max belief value: %f\n", max);
+
+    exit(0);
+  }
+  return; 
+}
+
+void scan_intersection_sim(int *tl, int *tr, int *br, int *bl)
+{
+ // This is a simulated version of scan_intersection for testing purposes only
+ // sims colors
+ printf("Simulating scan_intersection for sim_counter=%d\n", sim_counter);
+ if (sim_counter < SIM_COUNT) {
+  *tl = color_sim[sim_counter][0];
+  *tr = color_sim[sim_counter][1];
+  *br = color_sim[sim_counter][2];
+  *bl = color_sim[sim_counter][3];
+  return; 
+ }
+ return; 
 }
 
 int go_to_target(int robot_x, int robot_y, int direction, int target_x, int target_y)
@@ -628,8 +686,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   const int MAX_STEPS = sx * sy * 8;
   int steps = 0;
 
-  while (steps++ < MAX_STEPS) 
-  {
+  while (steps++ < MAX_STEPS) {
     if (cur_x == target_x && cur_y == target_y) {
       int tl,tr,br,bl;
       if (scan_intersection(&tl,&tr,&br,&bl)) {
@@ -642,18 +699,20 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
       else return 0;
     }
 
-    int tl,tr,br,bl;
-    if (scan_intersection(&tl,&tr,&br,&bl)) {
-      int z[4] = {tl,tr,br,bl};
-      updateBelief(z);
-    }
-    int bi, bd; double bv;
-    current_argmax(&bi,&bd,&bv);
-    cur_x = bi % sx;
-    cur_y = bi / sx;
-    cur_dir = bd;
+    {
+      int tl,tr,br,bl;
+      if (scan_intersection(&tl,&tr,&br,&bl)) {
+        int z[4] = {tl,tr,br,bl};
+        updateBelief(z);
+      }
+      int bi, bd; double bv;
+      current_argmax(&bi,&bd,&bv);
+      cur_x = bi % sx;
+      cur_y = bi / sx;
+      cur_dir = bd;
 
-    if (bv < nav_thresh) return 0;
+      if (bv < nav_thresh) return 0;
+    }
 
     int desired_dir = cur_dir;
     if      (cur_x < target_x) desired_dir = DIR_RIGHT;
@@ -676,9 +735,8 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
       rotateBeliefsRight();
     }
     cur_dir = desired_dir;
-
     int hit_count = 0;
-    execute_move(&hit_count);
+    execute_move_sim(&hit_count);
     actionModel();
 
     if (hit_count == 1) {
@@ -690,11 +748,13 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
       actionModel();
     }
 
+    int tl,tr,br,bl;
     if (scan_intersection(&tl,&tr,&br,&bl)) {
       int z[4] = {tl,tr,br,bl};
       updateBelief(z);
     }
 
+    int bi, bd; double bv;
     current_argmax(&bi,&bd,&bv);
     cur_x = bi % sx;
     cur_y = bi / sx;
@@ -728,9 +788,7 @@ int go_to_target(int robot_x, int robot_y, int direction, int target_x, int targ
   /************************************************************************************************************************
    *   OIPTIONAL TO DO  -   Complete this function
    ***********************************************************************************************************************/
-  color_calibration();
-  read_color_calibration(ranges);
-  color_probability(); 
+  read_color_probability(color_probabilities);
   return;
 }
 

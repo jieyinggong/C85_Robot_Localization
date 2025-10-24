@@ -14,17 +14,17 @@
 #define DIR_LEFT  3
 
 
-#define C_BLACK  0
-#define C_WHITE  1
-#define C_RED    2
-#define C_YELLOW 3
-#define C_GREEN  4
-#define C_BLUE   5
-#define C_OTHER  6
+#define C_BLACK   1
+#define C_BLUE    2
+#define C_GREEN   3
+#define C_YELLOW  4
+#define C_RED     5
+#define C_WHITE   6
+#define C_UNKNOWN 7
 
 #define COLOR_PORT PORT_1
 #define GYRO_PORT PORT_2
 #define LEFT_MOTOR MOTOR_A
 #define RIGHT_MOTOR MOTOR_D
 
-#endif // CONST_H
+#endif
